@@ -29,6 +29,7 @@ EXPECTED_COMMANDS = {"design", "doctor", "gates", "export"}
 EXPECTED_STOP_HOOKS = {"report-design-status"}
 EXPECTED_PRE_TOOL_USE_HOOKS = {"protect-generated"}
 EXPECTED_SESSION_START_HOOKS = {"mech-doctor"}
+EXPECTED_POST_TOOL_USE_HOOKS = {"record-image-observation", "record-vision-tool-event"}
 
 
 def _registered_tools() -> set[str]:
@@ -104,6 +105,11 @@ def check_plugin(plugin_dir: Path) -> list[str]:
             reasons.append(
                 f"stop hooks {sorted(collected['stop'])} != {sorted(EXPECTED_STOP_HOOKS)}"
             )
+        if collected["post_tool_use"] != EXPECTED_POST_TOOL_USE_HOOKS:
+            reasons.append(
+                f"post_tool_use hooks {sorted(collected['post_tool_use'])} != "
+                f"{sorted(EXPECTED_POST_TOOL_USE_HOOKS)}"
+            )
 
     registered = _registered_tools()
     for agent in plugin.agents:
@@ -123,10 +129,17 @@ def main() -> int:
         for reason in reasons:
             print(reason)
         return 1
+    all_hooks = (
+        EXPECTED_SESSION_START_HOOKS
+        | EXPECTED_PRE_TOOL_USE_HOOKS
+        | EXPECTED_STOP_HOOKS
+        | EXPECTED_POST_TOOL_USE_HOOKS
+    )
     print(
-        "plugin-load OK: agents={mech-brief,mech-design,mech-review} "
-        "skills=6 commands={design,doctor,gates,export} "
-        "hooks={mech-doctor,protect-generated,report-design-status,record-vision}"
+        f"plugin-load OK: agents={{{','.join(sorted(EXPECTED_AGENTS))}}} "
+        f"skills={{{','.join(sorted(EXPECTED_SKILLS))}}} "
+        f"commands={{{','.join(sorted(EXPECTED_COMMANDS))}}} "
+        f"hooks={{{','.join(sorted(all_hooks))}}}"
     )
     return 0
 
