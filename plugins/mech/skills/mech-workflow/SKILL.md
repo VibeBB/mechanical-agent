@@ -47,5 +47,7 @@ sub-agents through the SDK task tools (`TaskToolSet` + `AgentDefinition` +
 - `mech-brief` may read user-attached images (sketches, photos, drawings) via
   `inspect_image_with_vision`; adopted details become `A*`/`Q*` with the image as
   source — never `R*`.
-- `mech-review` may inspect renders/projections the same way; every vision call is
+- `mech-review` inspects renders/projections with the model's own vision
+  (`inspect_image_with_vision` covers only user-attached images, not workspace
+  files); every vision call is
   hashed into `.openhands/mech/vision-tool-events.jsonl` by the post_tool_use hook.

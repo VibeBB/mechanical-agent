@@ -42,8 +42,10 @@ find issues they do not cover and to flag suspects for re-measurement.
 Review inputs: `design-report.json`, the brief, and any rendered views of the parts
 (projection outlines in `*.dxf`, or renders/screenshots produced by the orchestrator).
 
-For visual inspection, use `inspect_image_with_vision` when available (or the model's
-own vision on the attached render) to check: obvious feature omissions against the
+For visual inspection, use the model's own vision on a rendered view
+(`file_editor view` displays images only when the model is vision-capable) —
+`inspect_image_with_vision` covers only images attached to the latest user
+message, not workspace renders — to check: obvious feature omissions against the
 brief (missing openings, wrong face), proportion sanity (paper-thin ligaments,
 colliding bosses), and drawing readability (DXF outline completeness). Record each
 observation as a finding with the image as source.
