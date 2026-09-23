@@ -257,16 +257,43 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         return _error(str(exc))
 
 
-@server.list_tools()  # type: ignore[misc]
-async def list_tools() -> list[types.Tool]:
+def _anno(title: str, *, write: bool) -> types.ToolAnnotations:
+    return types.ToolAnnotations(
+        title=title,
+        readOnlyHint=not write,
+        destructiveHint=write,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
+_ANNOTATIONS: dict[str, types.ToolAnnotations] = {
+    "mech_doctor": _anno("Mech doctor", write=False),
+    "mech_standards": _anno("Mech standards", write=False),
+    "mech_validate_brief": _anno("Validate design brief", write=False),
+    "mech_intake": _anno("Intake gate", write=False),
+    "mech_fit_lookup": _anno("ISO fit lookup", write=False),
+    "mech_author": _anno("Author design", write=True),
+    "mech_gates": _anno("Re-run gates", write=True),
+    "mech_export_envelope": _anno("Export envelope contract", write=True),
+}
+
+
+def tool_specs() -> list[types.Tool]:
     return [
         types.Tool(
             name=name,
             description=_DESCRIPTIONS[name],
             inputSchema=_SCHEMAS[name],
+            annotations=_ANNOTATIONS[name],
         )
         for name in _SCHEMAS
     ]
+
+
+@server.list_tools()  # type: ignore[misc]
+async def list_tools() -> list[types.Tool]:
+    return tool_specs()
 
 
 @server.call_tool()  # type: ignore[misc]

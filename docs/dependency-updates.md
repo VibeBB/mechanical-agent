@@ -11,8 +11,8 @@ the adoption decision for each. Update it in the same change that touches
 | build123d | `==0.13.0` | PyPI | Exact pin — CAD kernel behavior is release-sensitive (mesh/boolean edge cases verified against this version). Bundles OCP (OCCT 7.9) and ezdxf. Requires the `pillow>=12.3.0,<13` `override-dependencies` entry (see "Overrides"). |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.49.4` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.49.4` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.49.5` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.49.5` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
@@ -30,7 +30,7 @@ the adoption decision for each. Update it in the same change that touches
 
 | Package | Override | Why |
 | --- | --- | --- |
-| pillow | `>=12.3.0,<13` | `threejs-materials>=1.2.1,<1.3` (a required dep of `build123d>=0.13`) caps `pillow<12.3`, while `openhands-sdk>=1.49.4` requires `pillow>=12.3`. threejs-materials only feeds build123d's three.js viewer/material export, which the mech generation/gate path never touches; drop the override once threejs-materials relaxes the cap or the SDK's bound aligns. |
+| pillow | `>=12.3.0,<13` | `threejs-materials>=1.2.1,<1.3` (a required dep of `build123d>=0.13`) caps `pillow<12.3`, while `openhands-sdk>=1.49.5` requires `pillow>=12.3`. threejs-materials only feeds build123d's three.js viewer/material export, which the mech generation/gate path never touches; drop the override once threejs-materials relaxes the cap or the SDK's bound aligns. |
 
 ## Tooling pins
 

@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- MCP tool metadata: every `mech_*` tool now carries `annotations.title`
+  plus `readOnlyHint` / `destructiveHint` / `idempotentHint` /
+  `openWorldHint` so MCP clients (including AgentCanvas) can rank and
+  gate tool calls on honest write/read semantics.
+- `mech-brief-rules` path-triggered skill: schema/provenance reminders
+  injected whenever a `*.brief.json` / `*.intake.json` file is touched
+  (complements the keyword skills; rules and keyword triggers are
+  exclusive per skill).
 - Docker image distribution: `docker/mech-tools.Dockerfile` (ubuntu:26.04 +
   uv-pinned Python 3.12 + `uv.lock` runtime), `mech-server` image built via
   the OpenHands SDK agent-server docker build, and the GHCR publish

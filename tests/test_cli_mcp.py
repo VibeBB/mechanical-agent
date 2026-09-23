@@ -155,3 +155,28 @@ def test_mcp_bad_arguments_fail_closed():
 
     result = call_tool("mech_validate_brief", {"brief": {"design_type": "x"}})
     assert result.isError
+
+
+def test_mcp_tool_annotations():
+    from mech.mcp_server import tool_specs
+
+    write_tools = {"mech_author", "mech_gates", "mech_export_envelope"}
+    tools = tool_specs()
+    assert {tool.name for tool in tools} == {
+        "mech_doctor",
+        "mech_standards",
+        "mech_validate_brief",
+        "mech_intake",
+        "mech_fit_lookup",
+        "mech_author",
+        "mech_gates",
+        "mech_export_envelope",
+    }
+    for tool in tools:
+        annotations = tool.annotations
+        assert annotations is not None
+        assert annotations.title
+        assert annotations.readOnlyHint is (tool.name not in write_tools)
+        assert annotations.destructiveHint is (tool.name in write_tools)
+        assert annotations.idempotentHint is True
+        assert annotations.openWorldHint is False
