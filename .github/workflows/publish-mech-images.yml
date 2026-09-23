@@ -303,9 +303,27 @@ jobs:
             echo "lock PR pull_request checks did not all pass (pending=${pr_checks_ok}, non-success=${bad}); the lock PR was left open for manual review" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          if ! gh pr merge --repo "$GITHUB_REPOSITORY" --squash --delete-branch "$pr_url"; then
+          # --auto arms auto-merge so required checks that are still
+          # registering (zizmor can lag the run-level rollup, observed on #6:
+          # an immediate merge attempt raced the check rollup and was
+          # rejected by the base-branch policy) do not fail the merge call.
+          # When every required check is already green it merges at once.
+          if ! gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch "$pr_url"; then
             echo "lock PR merge was blocked; the lock PR was left open for manual review" >> "$GITHUB_STEP_SUMMARY"
             exit 1
+          fi
+          # The merge may only be armed: wait for it to land before the
+          # observational post-merge dispatches. A still-pending PR after the
+          # wait merges on its own once checks pass, so that is not a failure.
+          merged=false
+          for _ in $(seq 1 36); do
+            state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_url##*/}" --jq '.state')
+            [ "$state" = "closed" ] && { merged=true; break; }
+            sleep 10
+          done
+          if [ "$merged" != true ]; then
+            echo "auto-merge is armed on $pr_url but the merge did not land within the wait; post-merge checks skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           # The post-merge checks are observational: their conclusions (including
           # 'cancelled' when a newer main push supersedes them via concurrency
