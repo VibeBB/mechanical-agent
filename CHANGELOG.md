@@ -30,9 +30,13 @@ All notable changes to this project are documented here. The format follows
   report directly.
 - Docker action pins bumped: setup-buildx-action v4.4.1, login-action
   v4.6.0, build-push-action v7.4.0.
-- Deferred candidates recorded with re-check deadlines: build123d 0.13.0
-  and mcp 2.x (both bounded by openhands-sdk's transitive constraints),
-  Python 3.14 (unverified SDK/OCP wheel support).
+- build123d bumped to 0.13.0 via a `pillow>=12.3.0,<13`
+  `override-dependencies` entry (threejs-materials' `pillow<12.3` cap
+  conflicts with openhands-sdk's `pillow>=12.3`; the override is safe
+  because threejs-materials only feeds viewer/material export).
+- Deferred candidates recorded with re-check deadlines: mcp 2.x
+  (fastmcp-slim requires `mcp<2`) and Python 3.14 (unverified SDK/OCP
+  wheel support).
 
 ## [0.1.0] — first release
 
