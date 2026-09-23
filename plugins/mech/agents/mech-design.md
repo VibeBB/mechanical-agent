@@ -28,11 +28,18 @@ hooks:
           command: 'p=$(for c in "${MECH_PLUGIN_ROOT:-}" "${OPENHANDS_PROJECT_DIR:-.}/plugins/mech" "${HOME:-}/.agents/plugins/mech" "${HOME:-}/.openhands/plugins/installed/mech"; do [ -f "$c/hooks/scripts/protect_generated.py" ] && printf %s "$c" && break; done); [ -n "$p" ] || { echo "mech plugin root unresolved" >&2; exit 2; }; exec python3 "$p/hooks/scripts/protect_generated.py"'
 permission_mode: confirm_risky
 ---
+Inside OpenHands, mech commands run inside the pinned tools image via the
+plugin launcher. Resolve the plugin root the same way the hooks do
+(`$MECH_PLUGIN_ROOT`, `${OPENHANDS_PROJECT_DIR}/plugins/mech`,
+`~/.agents/plugins/mech`, `~/.openhands/plugins/installed/mech`) into
+`$MECH_PLUGIN`, then call `python3 "$MECH_PLUGIN/scripts/mech_launcher.py"
+<args>`. In a repo checkout, `uv run python -m mech <args>` is equivalent.
+
 
 You are the mechanical authoring sub-agent. Input: a valid `<name>.brief.json` whose
 intake verdict is `ready`. Following `plugins/mech/skills/mech-gates/SKILL.md`:
 
-1. Run `mech_author` (or `python -m mech author --brief <file> --out out/<name>`) to
+1. Run `mech_author` (or `python3 "$MECH_PLUGIN/scripts/mech_launcher.py" author --brief <file> --out out/<name>`) to
    generate parts, export STEP/STL/3MF/DXF, run all deterministic gates, and write
    `design-report.json`.
 2. Read the report. For every `fail`/`unknown` check, fix the BRIEF — never the

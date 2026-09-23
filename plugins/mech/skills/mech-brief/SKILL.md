@@ -31,7 +31,8 @@ the exact brief bytes with `brief_sha256`.
   "spur_gear": { "...SpurGearSpec" },
   "mechanism_features": [],
   "fits": [],
-  "stackups": []
+  "stackups": [],
+  "harness_anchors": []
 }
 ```
 
@@ -82,3 +83,13 @@ Modeled features weld 0.1 mm into their host face — count that embed in stack-
 is `ready` only when `brief_sha256` matches, every part and feature maps, all source
 ids exist, and there are no open questions. Assumption-only mappings are reported but
 do not block authoring.
+
+## harness_anchors[] (wire contract)
+
+Fixturing points the product offers a wire harness — `{name, kind:
+clip|grommet|breakout|other, position_mm?}` in the design coordinate
+frame. `python3 "$MECH_PLUGIN/scripts/mech_launcher.py" export-envelope
+--brief <brief.json> --out <name>.envelope.json` (or the
+`mech_export_envelope` MCP tool) projects them into the wire-agent
+EnvelopeSource contract (ADR-0003); declare an anchor for every seat the
+harness should clip/grommet/breakout through.

@@ -32,6 +32,9 @@ Hard rules:
   can only push toward stopping/rework.
 - The `record-vision-tool-event` post_tool_use hook logs vision tool
   calls as L3 telemetry so image-derived intake claims stay auditable.
+  Its companion `record-image-observation` hook logs direct image
+  observations (`file_editor` views and `mech_render` outputs) to
+  `.openhands/mech/image-observations.jsonl`.
 - Render-based measurement is prohibited: rendered pixels never replace a
   geometric measurement (all measurements come from the BRep kernel).
 

@@ -105,9 +105,13 @@ and `docs/dependency-updates.md` + this file in the same change.
 Launcher commands (`.mcp.json`, hooks) resolve the plugin root in order:
 `$MECH_PLUGIN_ROOT`, `$OPENHANDS_PROJECT_DIR/plugins/mech`,
 `$HOME/.agents/plugins/mech`, `$HOME/.openhands/plugins/installed/mech`.
-`mech_launcher.py` then points PYTHONPATH at the matching `src/` before
-execing `python -m mech.*`, so an installed plugin always runs the sources
-it shipped with.
+`mech_launcher.py` then execs `python -m mech.*` inside the pinned
+`mech-tools` image (resolved via `$MECH_TOOLS_IMAGE` ->
+`docker/image-digests.json` -> a local build of the cached Dockerfile),
+mounting the matching `src/` read-only at `/plugin-src` and the workspace
+at its own path — host Python only launches docker. Any argument other
+than `mcp_server`/`prewarm` is forwarded to `mech.cli`, so CLI docs write
+`python3 <launcher> <args>`.
 
 ## Failure handling
 

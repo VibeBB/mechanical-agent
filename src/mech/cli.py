@@ -1,11 +1,12 @@
 """mech command line interface.
 
 Subcommands:
-  doctor   probe the CAD/tool environment (JSON verdict)
-  intake   validate an intake.json against a brief.json (JSON verdict)
-  author   generate parts, export artifacts, run all gates, write the report
-  export   generate parts and export artifacts without gates
-  gates    regenerate the design and re-run all gates on existing artifacts
+  doctor          probe the CAD/tool environment (JSON verdict)
+  intake          validate an intake.json against a brief.json (JSON verdict)
+  author          generate parts, export artifacts, run all gates, write the report
+  export          generate parts and export artifacts without gates
+  gates           regenerate the design and re-run all gates on existing artifacts
+  export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
 
 All commands print a JSON verdict to stdout; the verdict is fail-closed.
 """
@@ -34,6 +35,29 @@ def _emit(payload: dict[str, Any]) -> int:
 
 def _cmd_doctor(_args: argparse.Namespace) -> dict[str, Any]:
     return run_doctor()
+
+
+def _emit_doctor(args: argparse.Namespace) -> int:
+    payload = run_doctor()
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if args.warn or payload.get("verdict") in ("pass", "ready") else 1
+
+
+def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
+    from .envelope import write_envelope
+
+    out_path = Path(args.out)
+    try:
+        brief = load_brief(Path(args.brief))
+        write_envelope(brief, out_path)
+    except Exception as exc:
+        return {"verdict": "fail", "stage": "export-envelope", "detail": str(exc)}
+    return {
+        "verdict": "pass",
+        "design": brief.name,
+        "anchors": [anchor.name for anchor in brief.harness_anchors],
+        "out": str(out_path),
+    }
 
 
 def _cmd_intake(args: argparse.Namespace) -> dict[str, Any]:
@@ -99,7 +123,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("doctor", help="probe the environment")
+    doctor_p = sub.add_parser("doctor", help="probe the environment")
+    doctor_p.add_argument(
+        "--warn",
+        action="store_true",
+        help="print the verdict but always exit 0 (advisory mode for hooks)",
+    )
 
     intake_p = sub.add_parser("intake", help="validate intake.json against a brief")
     intake_p.add_argument("--brief", required=True)
@@ -117,14 +146,24 @@ def build_parser() -> argparse.ArgumentParser:
     gates_p.add_argument("--brief", required=True)
     gates_p.add_argument("--out", required=True)
 
+    envelope_p = sub.add_parser(
+        "export-envelope",
+        help="emit the wire-agent envelope contract",
+    )
+    envelope_p.add_argument("--brief", required=True)
+    envelope_p.add_argument("--out", required=True)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "doctor":
+        return _emit_doctor(args)
     handlers = {
         "doctor": _cmd_doctor,
+        "export-envelope": _cmd_export_envelope,
         "intake": _cmd_intake,
         "author": _cmd_author,
         "export": _cmd_export,

@@ -95,6 +95,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["brief", "out_dir"],
         "additionalProperties": False,
     },
+    "mech_export_envelope": {
+        "type": "object",
+        "properties": {
+            "brief": {"type": "object"},
+            "out_path": {"type": "string"},
+        },
+        "required": ["brief", "out_path"],
+        "additionalProperties": False,
+    },
 }
 
 _DESCRIPTIONS = {
@@ -105,6 +114,9 @@ _DESCRIPTIONS = {
     "mech_fit_lookup": "Evaluate one ISO limits-and-fits pair (clearance window + class).",
     "mech_author": "Generate parts, export artifacts, run all gates, write the design report.",
     "mech_gates": "Regenerate the design and re-run all gates against out_dir artifacts.",
+    "mech_export_envelope": (
+        "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
+    ),
 }
 
 
@@ -224,6 +236,20 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             intake = Intake.model_validate(arguments["intake"])
             report = check_intake(brief, intake, Path("<inline>"), Path("<inline>"))
             return _ok(report.model_dump(mode="json"))
+        if name == "mech_export_envelope":
+            from .brief import DesignBrief
+            from .envelope import write_envelope
+
+            brief = DesignBrief.model_validate(arguments["brief"])
+            out_path = write_envelope(brief, Path(arguments["out_path"]))
+            return _ok(
+                {
+                    "verdict": "pass",
+                    "design": brief.name,
+                    "anchors": [anchor.name for anchor in brief.harness_anchors],
+                    "out": str(out_path),
+                }
+            )
         if name in ("mech_author", "mech_gates"):
             return _run_pipeline(name, arguments)
         return _error(f"unknown mech tool: {name}")
