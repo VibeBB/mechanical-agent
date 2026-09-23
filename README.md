@@ -41,6 +41,10 @@ SDK plugin layout (skills, agents, commands, hooks, `.mcp.json`). Point the
 agent at this repository or install `plugins/mech` into your OpenHands
 plugin store.
 
+Prebuilt container images are published to GHCR (`ghcr.io/vibebb/mech-tools`,
+`ghcr.io/vibebb/mech-server`; digest-locked via `docker/image-digests.json`)
+— see `docker/README.md` for build and run examples.
+
 Requires Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ### Using the plugin

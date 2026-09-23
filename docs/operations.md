@@ -34,6 +34,27 @@ uv run python -m mech gates \
 idempotent: the same brief produces the same artifacts (sha256 in
 `manifest.json`).
 
+## Container images
+
+`docker/mech-tools.Dockerfile` builds the deterministic core image; the
+publish workflow also builds `mech-server` (OpenHands agent-server target
+`source` on top of the tools image). Both are published to GHCR:
+
+- `ghcr.io/<owner>/mech-tools:<sha>-tools` (immutable) + `:latest`
+- `ghcr.io/<owner>/mech-server:<sha>-latest-source` + `:latest`
+
+`docker/image-digests.json` is the digest lock. It is written only by
+`publish-mech-images.yml` (main pushes under `docker/`, `src/`,
+`plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, or manual
+dispatch); the workflow opens a lock-update PR, runs CI on it, and merges.
+Do not commit placeholder entries — `scripts/print_locked_image.py` rejects
+placeholder digests.
+
+`locked-image-check.yml` (weekly + post-publish) pulls the locked tools
+image and re-runs `e2e_authoring` inside the container as the smoke check.
+
+Local build and run instructions live in `docker/README.md`.
+
 ## CI
 
 - `ci.yml` — `verify` (matrix 3.12/3.13: sync, ruff, format, pyright,
@@ -43,10 +64,15 @@ idempotent: the same brief produces the same artifacts (sha256 in
   and weekly; uploads SARIF.
 - `check-dependency-updates.yml` — weekly + manual; posts candidates to the
   "Dependency update check report" issue.
+- `publish-mech-images.yml` — builds and publishes the GHCR images and
+  updates the digest lock via a self-merging PR (see "Container images").
+- `locked-image-check.yml` — weekly + post-publish smoke of the locked
+  image (see "Container images").
 - `release.yml` — manual dispatch only (see below).
 
 Every `uses:` is pinned to a 40-char SHA with a `# vX.Y.Z` comment;
-checkout uses `persist-credentials: false` except the release bump job.
+checkout uses `persist-credentials: false` except the release bump job and
+the image publish job (the lock-update PR needs push credentials).
 
 ## Releasing
 

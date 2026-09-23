@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Docker image distribution: `docker/mech-tools.Dockerfile` (ubuntu:26.04 +
+  uv-pinned Python 3.12 + `uv.lock` runtime), `mech-server` image built via
+  the OpenHands SDK agent-server docker build, and the GHCR publish
+  workflow `publish-mech-images.yml` with digest-lock
+  (`docker/image-digests.json`) update PRs.
+- `locked-image-check.yml`: weekly/post-publish smoke of the locked tools
+  image (runs `e2e_authoring` inside the container).
+- `examples/enclosure.brief.json` (used by docs and the image smoke check).
+- Dependency checker coverage for Dockerfile `ARG` pins and the `ubuntu`
+  base image tag.
+
 ## [0.1.0] — first release
 
 ### Added

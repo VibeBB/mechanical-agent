@@ -11,6 +11,13 @@ on:
         type: string
         required: false
         default: ""
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: "Comparison baseline commit (empty = full run)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
