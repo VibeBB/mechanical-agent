@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/check_plugin_load.py` now asserts `post_tool_use` hooks (previously
+  collected but unchecked) and renders the OK summary from the actual expected
+  asset sets instead of a stale hardcoded string.
+
+
 ### Added
 
 - MCP tool metadata: every `mech_*` tool now carries `annotations.title`
