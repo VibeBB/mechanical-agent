@@ -16,10 +16,6 @@ All notable changes to this project are documented here. The format follows
 
 - `mech-brief` declares the `record-vision-tool-event` post hook in
   frontmatter (plugin hooks do not propagate to task sub-agents).
-
-
-### Added
-
 - MCP tool metadata: every `mech_*` tool now carries `annotations.title`
   plus `readOnlyHint` / `destructiveHint` / `idempotentHint` /
   `openWorldHint` so MCP clients (including AgentCanvas) can rank and
