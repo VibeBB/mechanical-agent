@@ -30,6 +30,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # gh issue create fails with "could not add label" when the label
+          # does not exist (observed before the first report issue landed).
+          gh label create dependency-updates --repo "$GITHUB_REPOSITORY" \
+            --color 0366d6 --description "Dependency update report" --force
           issue=$(gh issue list --label dependency-updates --state open \
             --json number --jq '.[0].number' || true)
           if [ -z "$issue" ]; then
