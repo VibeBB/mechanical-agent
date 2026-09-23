@@ -19,6 +19,21 @@ All notable changes to this project are documented here. The format follows
 - Dependency checker coverage for Dockerfile `ARG` pins and the `ubuntu`
   base image tag.
 
+### Changed
+
+- `check_dependency_updates.py` now reports per-surface markdown tables
+  (pypi direct, pypi-lock transitive drift, uv pin, Python versions,
+  GitHub Actions, uvx pins, Docker ARG, Docker base) with `update
+  available` / `deferred` / `up to date` states, lock-based `current`
+  versions, `--markdown`/`--json` output flags, and deferral support via
+  `scripts/dependency_update_deferrals.json`; the workflow posts this
+  report directly.
+- Docker action pins bumped: setup-buildx-action v4.4.1, login-action
+  v4.6.0, build-push-action v7.4.0.
+- Deferred candidates recorded with re-check deadlines: build123d 0.13.0
+  and mcp 2.x (both bounded by openhands-sdk's transitive constraints),
+  Python 3.14 (unverified SDK/OCP wheel support).
+
 ## [0.1.0] — first release
 
 ### Added

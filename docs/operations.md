@@ -91,8 +91,10 @@ Update `CHANGELOG.md` in the release PR before dispatching.
 ## Dependency updates
 
 Follow [dependency-updates.md](dependency-updates.md). Weekly candidates
-land in the "Dependency update check report" issue. To defer a candidate,
-record `{name, reason, deadline}` in
+land in the "Dependency update check report" issue as per-surface markdown
+tables (pypi, pypi-lock, uv-pin, python-version, github-actions, pypi-uvx,
+docker-arg, docker-base). To defer a candidate, record
+`{surface, name, latest, review_by, reason}` in
 `scripts/dependency_update_deferrals.json` and revisit on the deadline or
 when a newer version appears. When adding/removing a dependency or a new
 external source, update `scripts/check_dependency_updates.py`, its tests,
