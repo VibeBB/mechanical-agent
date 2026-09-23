@@ -1,27 +1,48 @@
-"""Resolve the mech package that matches the installed plugin, then exec.
+"""Resolve the mech package and tools image, then exec inside Docker.
 
 Plugin installs update the assets under plugins/mech but do not reinstall
-the `mech` Python package, so `python3 -m mech.*` may import a stale
-site-packages copy that lacks the tools the assets expect. This launcher
-points PYTHONPATH at a source tree consistent with the plugin before execing
-the requested module.
+the `mech` Python package, and the host interpreter is not guaranteed to
+carry the package dependencies. The launcher therefore runs every mech
+module inside the pinned mech-tools image, mounting the resolved source
+tree and the workspace so paths stay identical inside the container.
 
-Resolution order (first directory containing mech/__init__.py wins):
+Source resolution order (first directory containing mech/__init__.py wins):
   1. $MECH_SRC
   2. newest ~/.openhands/cache/extensions/mechanical-agent-*/src
   3. /opt/mech/src (mech-server image)
   4. <repo>/src when running from a repository checkout
-  5. none found -> fall back to the already-installed package
+  5. none found -> the image's own baked package is used
+
+Image resolution order (first hit wins):
+  1. $MECH_TOOLS_IMAGE (full ref, e.g. ghcr.io/.../mech-tools@sha256:...)
+  2. <plugin>/tools-image.json or repo-cache docker/image-digests.json
+     (image + digest, falling back to image + tag)
+  3. local build of the repo-cache docker/mech-tools.Dockerfile,
+     tagged openhands-mech-tools:<dockerfile sha256[:12]>
+
+Usage: mcp_server | prewarm | <mech cli args...>. Any argument other
+than mcp_server/prewarm is forwarded to `python -m mech.cli` inside the
+container. When `--warn` is present (SessionStart doctor mode), a failed
+image resolution prints a warning and exits 0.
 """
 
 from __future__ import annotations
 
-import argparse
+import hashlib
+import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
-_MODULES = {"mcp_server": "mech.mcp_server", "doctor": "mech.cli"}
+_MODULES = {
+    "mcp_server": ("mech.mcp_server",),
+}
+
+_CONTAINER_SRC = "/plugin-src"
+_ENV_PREFIXES = ("OPENHANDS_", "MECH_")
+_ENV_KEYS = ("HOME", "TMPDIR")
 
 
 def _candidates(plugin_root: Path) -> list[Path]:
@@ -56,27 +77,188 @@ def resolve_source(plugin_root: Path) -> Path | None:
     return None
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("module", choices=sorted(_MODULES))
-    parser.add_argument("args", nargs=argparse.REMAINDER)
-    ns = parser.parse_args()
+def _repo_dirs(plugin_root: Path) -> list[Path]:
+    """Directories that may carry docker/ build assets for this plugin."""
+    dirs: list[Path] = []
+    repo_checkout = plugin_root.parent.parent
+    if (repo_checkout / "docker").is_dir():
+        dirs.append(repo_checkout)
+    cache = Path.home() / ".openhands" / "cache" / "extensions"
+    try:
+        if cache.is_dir():
+            dirs.extend(
+                sorted(
+                    (p for p in cache.glob("mechanical-agent-*") if p.is_dir()),
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
+            )
+    except OSError:
+        pass
+    return dirs
 
-    plugin_root = Path(__file__).resolve().parent.parent
-    source = resolve_source(plugin_root)
-    if source is not None:
-        python_path = os.environ.get("PYTHONPATH")
-        os.environ["PYTHONPATH"] = (
-            f"{source}{os.pathsep}{python_path}" if python_path else str(source)
+
+def _lock_entry_ref(lock_path: Path, key: str | None) -> str | None:
+    try:
+        data = json.loads(lock_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    entry = data.get(key) if key else data
+    if not isinstance(entry, dict) or not entry.get("image"):
+        return None
+    if entry.get("digest"):
+        return f"{entry['image']}@{entry['digest']}"
+    if entry.get("tag"):
+        return f"{entry['image']}:{entry['tag']}"
+    return None
+
+
+def _image_from_lock(plugin_root: Path) -> str | None:
+    ref = _lock_entry_ref(plugin_root / "tools-image.json", None)
+    if ref:
+        return ref
+    for repo_dir in _repo_dirs(plugin_root):
+        ref = _lock_entry_ref(repo_dir / "docker" / "image-digests.json", "mech_tools")
+        if ref:
+            return ref
+    return None
+
+
+def _dockerfile(plugin_root: Path) -> Path | None:
+    for repo_dir in _repo_dirs(plugin_root):
+        candidate = repo_dir / "docker" / "mech-tools.Dockerfile"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _local_tag(dockerfile: Path) -> str:
+    digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()[:12]
+    return f"openhands-mech-tools:{digest}"
+
+
+def _docker() -> str | None:
+    return shutil.which("docker")
+
+
+def _ensure_image(plugin_root: Path) -> str:
+    """Resolve the tools image ref, building from the cache as last resort."""
+    docker = _docker()
+    if docker is None:
+        raise RuntimeError("docker not found on PATH (mech runs docker-only)")
+
+    ref = os.environ.get("MECH_TOOLS_IMAGE") or _image_from_lock(plugin_root)
+    if ref:
+        if (
+            subprocess.run(
+                [docker, "image", "inspect", ref],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            ).returncode
+            == 0
+        ):
+            return ref
+        print(f"mech_launcher: pulling tools image {ref}", file=sys.stderr)
+        if subprocess.run([docker, "pull", ref], check=False).returncode == 0:
+            return ref
+        print(f"mech_launcher: pull failed for {ref}", file=sys.stderr)
+
+    dockerfile = _dockerfile(plugin_root)
+    if dockerfile is None:
+        raise RuntimeError(
+            "no mech tools image resolvable and no docker/mech-tools.Dockerfile found to build one"
         )
+    tag = _local_tag(dockerfile)
+    if (
+        subprocess.run(
+            [docker, "image", "inspect", tag],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+        == 0
+    ):
+        return tag
+    print(
+        f"mech_launcher: building tools image {tag} from {dockerfile}",
+        file=sys.stderr,
+    )
+    result = subprocess.run(
+        [
+            docker,
+            "build",
+            "--tag",
+            tag,
+            "--file",
+            str(dockerfile),
+            str(dockerfile.parent.parent),
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"docker build failed for {tag}")
+    return tag
 
-    if ns.module == "doctor":
-        argv = [sys.executable, "-m", "mech.cli", "doctor", *ns.args]
+
+def _docker_argv(image: str, source: Path | None, inner_argv: list[str]) -> list[str]:
+    workdir = os.environ.get("OPENHANDS_PROJECT_DIR") or os.getcwd()
+    argv = [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "none",
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "-v",
+        f"{workdir}:{workdir}",
+        "-w",
+        workdir,
+    ]
+    if source is not None:
+        argv += ["-v", f"{source}:{_CONTAINER_SRC}:ro", "-e", f"PYTHONPATH={_CONTAINER_SRC}"]
+    for key, value in os.environ.items():
+        if key in _ENV_KEYS or any(key.startswith(p) for p in _ENV_PREFIXES):
+            argv += ["-e", f"{key}={value}"]
+    argv.append(image)
+    argv += inner_argv
+    return argv
+
+
+def _warn_or_die(message: str, module_args: list[str]) -> int:
+    if "--warn" in module_args:
+        print(f"warn: {message}", file=sys.stderr)
+        print(json.dumps({"verdict": "fail", "detail": message}))
+        return 0
+    print(f"mech_launcher: {message}", file=sys.stderr)
+    return 1
+
+
+def main() -> int:
+    argv = sys.argv[1:]
+    if not argv:
+        print("usage: mech_launcher.py {mcp_server|prewarm|<mech cli args...>}", file=sys.stderr)
+        return 2
+
+    plugin_root = Path(__file__).resolve().parents[1]
+    try:
+        image = _ensure_image(plugin_root)
+    except RuntimeError as exc:
+        return _warn_or_die(str(exc), argv)
+    if argv[0] == "prewarm":
+        print(f"mech_launcher: tools image ready: {image}")
+        return 0
+
+    source = resolve_source(plugin_root)
+    if argv[0] in _MODULES:
+        inner = ["python", "-m", _MODULES[argv[0]], *argv[1:]]
     else:
-        argv = [sys.executable, "-m", _MODULES[ns.module], *ns.args]
-    os.execvpe(sys.executable, argv, os.environ)
-    return 127
+        inner = ["python", "-m", "mech.cli", *argv]
+    os.execvp("docker", _docker_argv(image, source, inner))
+    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

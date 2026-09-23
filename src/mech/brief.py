@@ -333,6 +333,21 @@ class StackupChain(BaseModel):
         return self
 
 
+class HarnessAnchor(BaseModel):
+    """A fixturing point exported to wire-agent as an envelope anchor.
+
+    `kind` names the seat type (clip, grommet, breakout, other);
+    `position_mm` is the anchor's location in the design coordinate
+    frame when known.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
+    kind: Literal["clip", "grommet", "breakout", "other"] = "other"
+    position_mm: tuple[float, float, float] | None = None
+
+
 class DesignBrief(BaseModel):
     """Top-level design contract consumed by the generators and gates."""
 
@@ -351,6 +366,7 @@ class DesignBrief(BaseModel):
     mechanism_features: list[MechanismFeature] = Field(default_factory=list[MechanismFeature])
     fits: list[FitDeclaration] = Field(default_factory=list[FitDeclaration])
     stackups: list[StackupChain] = Field(default_factory=list[StackupChain])
+    harness_anchors: list[HarnessAnchor] = Field(default_factory=list[HarnessAnchor])
 
     @model_validator(mode="after")
     def validate_design(self) -> DesignBrief:
@@ -378,6 +394,9 @@ class DesignBrief(BaseModel):
         for fit in self.fits:
             if fit.feature not in declared and not _feature_id_known(self, fit.feature):
                 raise ValueError(f"fit {fit.id} references unknown feature: {fit.feature}")
+        anchor_names = [anchor.name for anchor in self.harness_anchors]
+        if len(set(anchor_names)) != len(anchor_names):
+            raise ValueError("harness anchor names must be unique")
         return self
 
     def part_ids(self) -> list[str]:
