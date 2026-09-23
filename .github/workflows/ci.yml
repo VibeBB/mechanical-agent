@@ -13,11 +13,10 @@ on:
         default: ""
   workflow_dispatch:
     inputs:
-      base_sha:
-        description: "Comparison baseline commit (empty = full run)"
+      ref:
+        type: string
         required: false
         default: ""
-        type: string
 
 permissions:
   contents: read
@@ -28,6 +27,9 @@ concurrency:
 
 jobs:
   verify:
+    # pull_request runs on bot/* branches are skipped: publish and release
+    # dispatch this workflow on those branches and gate on the results.
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'bot/')
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     strategy:
@@ -56,6 +58,7 @@ jobs:
         run: uv run python scripts/verify_docs.py
 
   plugin-load:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'bot/')
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:

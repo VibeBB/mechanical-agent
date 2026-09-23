@@ -11,16 +11,40 @@ on:
 
 permissions:
   contents: read
-  security-events: write
+
+concurrency:
+  group: workflow-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   zizmor:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      # Uploads the SARIF report to code scanning.
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # actionlint catches YAML structural errors (e.g. duplicate keys) that
+      # produce a zero-jobs run with no logs; zizmor does not check them.
+      - name: Actionlint
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/actionlint"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          curl -fsSLO https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint_1.7.12_linux_amd64.tar.gz" | sha256sum -c -
+          tar -xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
+          cd "$GITHUB_WORKSPACE"
+          # The ubuntu-26.04 label is newer than actionlint's bundled runner
+          # list; only that specific finding is ignored.
+          "$workdir/actionlint" -oneline \
+            -ignore 'label "ubuntu-26\.04" is unknown' \
+            .github/workflows/*.yml
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
