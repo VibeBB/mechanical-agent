@@ -1,0 +1,12 @@
+{
+  "name": "mech",
+  "version": "0.1.0",
+  "description": "OpenHands plugin for conversational mechanical design (enclosures, brackets, gears)",
+  "author": {
+    "name": "VibeBB",
+    "url": "https://github.com/VibeBB/mechanical-agent"
+  },
+  "license": "BSD-3-Clause",
+  "repository": "https://github.com/VibeBB/mechanical-agent",
+  "entry_command": "doctor"
+}

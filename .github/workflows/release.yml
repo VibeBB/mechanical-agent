@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump kind"
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+      version:
+        description: "Explicit X.Y.Z override; leave empty to bump"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      sha: ${{ steps.bump.outputs.sha }}
+    steps:
+      - name: Require main
+        env:
+          REF: ${{ github.ref }}
+        run: test "$REF" = "refs/heads/main"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Bump version files
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+          SET_VERSION: ${{ inputs.version }}
+        run: |
+          SKIP_COMMIT=false
+          if [ -n "$SET_VERSION" ]; then
+            CURRENT=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+            if [ "$SET_VERSION" = "$CURRENT" ]; then
+              VERSION=$SET_VERSION
+              SKIP_COMMIT=true
+            else
+              VERSION=$(python3 scripts/bump_version.py --set "$SET_VERSION")
+            fi
+          else
+            VERSION=$(python3 scripts/bump_version.py --bump "$BUMP")
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}"; then
+            echo "::error::tag v${VERSION} already exists" >&2
+            exit 1
+          fi
+          if [ "$SKIP_COMMIT" = false ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add plugins/mech/.plugin/plugin.json pyproject.toml uv.lock
+            git commit -m "Release v${VERSION}: update version files"
+            if ! git push origin HEAD:main; then
+              echo "::error::direct push to main was rejected." >&2
+              exit 1
+            fi
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: bump-version
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository] same-repo reuse
+    with:
+      ref: ${{ needs.bump-version.outputs.sha }}
+
+  release:
+    needs: [bump-version, verify]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.bump-version.outputs.version }}
+      SHA: ${{ needs.bump-version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.bump-version.outputs.sha }}
+          persist-credentials: false
+      - name: Build release zip
+        run: |
+          mkdir -p dist
+          (cd plugins && zip -r "../dist/mech-plugin-v${VERSION}.zip" mech)
+      - name: Create release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v${VERSION}" --target "$SHA"
+          --title "mech v${VERSION}" --generate-notes dist/*.zip
