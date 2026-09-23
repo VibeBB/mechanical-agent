@@ -242,54 +242,66 @@ jobs:
             "workflow run: ${workflow_run}")
           pr_url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
             --title "Update mech image digest lock" --body "$body")
-          # A pull_request-triggered ci.yml run is also recorded for the bot
-          # PR. Its check suite becomes the newest github-actions suite on the
-          # head SHA, so the ruleset's required check must come from it — a
-          # green result from only the dispatched run still leaves the merge
-          # blocked. Under an approval-gated Actions policy the run lands as
-          # action_required; approve it up front (this job has actions: write)
-          # so it can run alongside the dispatched gate below.
-          pr_ci_run=""
-          for _ in $(seq 1 6); do
-            pr_ci_run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${branch}&event=pull_request&per_page=10" \
-              --jq '.workflow_runs[0].id // empty' || true)
-            [ -n "$pr_ci_run" ] && break
-            sleep 5
-          done
-          if [ -n "$pr_ci_run" ] && \
-             [ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${pr_ci_run}" --jq '.conclusion // ""')" = "action_required" ]; then
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${pr_ci_run}/approve" || true
-          fi
+          # pull_request-triggered runs on the bot branch (ci.yml, workflow
+          # lint, ...) can land as action_required under an approval-gated
+          # Actions policy. Their check suites become the newest
+          # github-actions suites on the head SHA, and a required check
+          # stuck at action_required blocks the merge just like a failure
+          # does — so approve every gated run for this branch (this job has
+          # actions: write). Runs appear asynchronously; poll briefly.
+          approve_gated_runs() {
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=action_required&per_page=100" \
+              --jq ".workflow_runs[] | select(.head_branch==\"$branch\") | .id" \
+              | while read -r run_id; do
+                  gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/approve" || true
+                done
+          }
+          approve_gated_runs
           if ! dispatch_workflow ci.yml "$branch" -f "base_sha=$base_sha"; then
             echo "lock PR checks failed; the lock PR was left open for manual review" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          # Wait for the pull_request run once it is real (jobs started —
-          # directly, or after the approval above); cancelling one flips the
-          # required check to cancelled and the merge stays blocked. A stillborn
-          # run never starts jobs; it sits in startup until the branch-deleting
-          # merge kills it with a spurious "workflow file issue" failure, so it
-          # is still cancelled here.
-          if [ -n "$pr_ci_run" ]; then
-            pr_ci_real=false
-            for _ in $(seq 1 18); do
-              pr_ci_conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${pr_ci_run}" \
-                --jq '.conclusion // ""' || true)
-              if [ "$pr_ci_conclusion" = "action_required" ]; then
-                gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${pr_ci_run}/approve" || true
-              elif [ -n "$pr_ci_conclusion" ]; then
-                break
-              fi
-              pr_ci_jobs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${pr_ci_run}/jobs?per_page=1" \
-                --jq '.total_count // 0' || echo 0)
-              [ "$pr_ci_jobs" -gt 0 ] && pr_ci_real=true && break
-              sleep 10
-            done
-            if [ "$pr_ci_real" = true ]; then
-              gh run watch --repo "$GITHUB_REPOSITORY" "$pr_ci_run" || true
-            else
-              gh run cancel --repo "$GITHUB_REPOSITORY" "$pr_ci_run" || true
+          # Wait for every pull_request run on the lock branch to reach a
+          # conclusion: they are the check suites the ruleset's required
+          # checks read. A stillborn run never starts jobs; it sits in
+          # startup until the branch-deleting merge kills it with a spurious
+          # "workflow file issue" failure, so it is cancelled once nothing
+          # else is pending. An approved-but-still-pending run keeps the
+          # loop going instead.
+          pr_checks_ok=false
+          for _ in $(seq 1 36); do
+            # Runs can surface gated later than the initial sweep, so keep
+            # approving while waiting.
+            approve_gated_runs
+            pending=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${branch}&event=pull_request&per_page=100" \
+              --jq '[.workflow_runs[] | select(.conclusion == null)] | length')
+            if [ "$pending" -eq 0 ]; then
+              pr_checks_ok=true
+              break
             fi
+            sleep 10
+          done
+          if [ "$pr_checks_ok" != true ]; then
+            for run_id in $(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${branch}&event=pull_request&per_page=100" \
+              --jq '.workflow_runs[] | select(.conclusion == null) | .id'); do
+              jobs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=1" \
+                --jq '.total_count // 0' || echo 0)
+              if [ "$jobs" -eq 0 ]; then
+                gh run cancel --repo "$GITHUB_REPOSITORY" "$run_id" || true
+              fi
+            done
+            pending_after=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${branch}&event=pull_request&per_page=100" \
+              --jq '[.workflow_runs[] | select(.conclusion == null)] | length')
+            [ "$pending_after" -eq 0 ] && pr_checks_ok=true
+          fi
+          # Only hard failures block: skipped/neutral/cancelled conclusions
+          # are benign (a required check that ended cancelled still blocks
+          # the merge call itself, so this stays fail-closed).
+          bad=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${branch}&event=pull_request&per_page=100" \
+            --jq '[.workflow_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral" and .conclusion != "cancelled")] | length')
+          if [ "$pr_checks_ok" != true ] || [ "$bad" -gt 0 ]; then
+            echo "lock PR pull_request checks did not all pass (pending=${pr_checks_ok}, non-success=${bad}); the lock PR was left open for manual review" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
           if ! gh pr merge --repo "$GITHUB_REPOSITORY" --squash --delete-branch "$pr_url"; then
             echo "lock PR merge was blocked; the lock PR was left open for manual review" >> "$GITHUB_STEP_SUMMARY"
