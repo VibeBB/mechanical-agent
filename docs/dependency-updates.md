@@ -41,6 +41,17 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | actions/checkout | v7.0.1 |
 | astral-sh/setup-uv | v10.2.0 |
 | github/codeql-action/upload-sarif | v4.38.1 |
+| docker/setup-buildx-action | v4 |
+| docker/login-action | v4 |
+| docker/build-push-action | v7 |
+
+## Docker image pins
+
+| Item | Pin | Where |
+| --- | --- | --- |
+| ubuntu base image | `26.04` | `docker/mech-tools.Dockerfile` `FROM` |
+| uv | `0.12.18` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
+| Python in image | `3.12` | `uv python install` inside the Dockerfile |
 
 ## Checked by `scripts/check_dependency_updates.py`
 
@@ -48,6 +59,10 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 - uv required-version against PyPI `uv`.
 - GitHub Actions `uses:` SHA pins against latest repo tag.
 - `uvx` tool pins in workflows against PyPI.
+- Dockerfile `ARG UV_VERSION` against the latest `astral-sh/uv` tag; the ARG
+  is asserted equal to `[tool.uv] required-version` by a unit test.
+- Dockerfile `FROM ubuntu:YY.MM` against the newest Ubuntu `YY.04` LTS tag
+  on Docker Hub.
 
 The weekly workflow posts the report to the "Dependency update check
 report" issue. Deferred candidates are recorded in

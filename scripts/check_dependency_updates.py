@@ -2,8 +2,9 @@
 """Report dependency updates without modifying repository source files.
 
 Checks: direct PyPI dependencies in pyproject.toml, dev-group pins, the uv
-version pin, GitHub Actions `uses:` pins (40-char SHA), and `uvx` tool pins
-in workflows. Prints a JSON report; exit 0 always (report-only).
+version pin, GitHub Actions `uses:` pins (40-char SHA), `uvx` tool pins in
+workflows, Docker ARG pins in docker/*.Dockerfile, and the Docker base
+image. Prints a JSON report; exit 0 always (report-only).
 
 See docs/dependency-updates.md for the update procedure.
 """
@@ -157,11 +158,125 @@ def check_actions() -> list[Status]:
     return statuses
 
 
+_DOCKER_ARG = re.compile(r"^ARG\s+([A-Z_]+)=([^\s#]+)", re.MULTILINE)
+_DOCKER_FROM = re.compile(r"^FROM\s+([^\s:@]+)(?::([^\s@]+))?", re.MULTILINE)
+_DOCKERFILES = ["mech-tools.Dockerfile"]
+
+
+def docker_arg_pins() -> dict[str, str]:
+    """ARG name -> default value across docker/*.Dockerfile."""
+    values: dict[str, str] = {}
+    for name in _DOCKERFILES:
+        path = ROOT / "docker" / name
+        if not path.is_file():
+            continue
+        for key, value in _DOCKER_ARG.findall(path.read_text(encoding="utf-8")):
+            values[key] = value
+    return values
+
+
+def docker_base_image() -> tuple[str, str] | None:
+    """First non-ARG FROM image: (image, tag) of the runtime base stage."""
+    for name in _DOCKERFILES:
+        path = ROOT / "docker" / name
+        if not path.is_file():
+            continue
+        for image, tag in _DOCKER_FROM.findall(path.read_text(encoding="utf-8")):
+            if "$" in image or "$" in tag or tag == "":
+                continue
+            if image == "ghcr.io/astral-sh/uv":
+                continue  # tracked via UV_VERSION docker-arg
+            return image, tag
+    return None
+
+
+_DOCKER_ARG_UPSTREAMS = {
+    # ARG name -> (github repo, current-tag prefix stripped before compare)
+    "UV_VERSION": ("astral-sh/uv", ""),
+}
+
+
+def check_docker_args() -> list[Status]:
+    statuses: list[Status] = []
+    values = docker_arg_pins()
+    for arg, (repo, strip) in _DOCKER_ARG_UPSTREAMS.items():
+        current = values.get(arg)
+        if current is None:
+            statuses.append(Status(f"docker:{arg}", "-", "?", "docker-arg", False, "ARG missing"))
+            continue
+        latest = _github_latest_tag(repo)
+        latest_cmp = (latest or "").removeprefix(strip)
+        current_cmp = current.removeprefix(strip)
+        outdated = bool(latest_cmp) and latest_cmp != current_cmp
+        statuses.append(
+            Status(
+                f"docker:{arg}",
+                current,
+                latest or "?",
+                "docker-arg",
+                outdated,
+                "" if latest_cmp else "fetch failed",
+            )
+        )
+    return statuses
+
+
+_DOCKERHUB_TAGS = (
+    "https://hub.docker.com/v2/repositories/library/{image}/tags"
+    "?page_size=100&name=&ordering=-last_updated"
+)
+
+
+def _ubuntu_lts_tags() -> list[str]:
+    url: str | None = _DOCKERHUB_TAGS.format(image="ubuntu")
+    tags: list[str] = []
+    for _page in range(10):
+        if url is None:
+            break
+        try:
+            data = _fetch_json(url)
+        except Exception:
+            return []
+        for item in data.get("results", []):
+            name = item.get("name")
+            if isinstance(name, str) and re.fullmatch(r"\d{2}\.04", name):
+                tags.append(name)
+        next_url = data.get("next")
+        url = next_url if isinstance(next_url, str) and next_url else None
+    return tags
+
+
+def check_docker_base() -> list[Status]:
+    base = docker_base_image()
+    if base is None:
+        return []
+    image, current = base
+    if image != "ubuntu" or re.fullmatch(r"\d{2}\.04", current) is None:
+        return [
+            Status(f"docker-base:{image}", current, "?", "docker-base", False, "unhandled image")
+        ]
+    latest = max(
+        _ubuntu_lts_tags(), key=lambda t: tuple(int(p) for p in t.split(".")), default=None
+    )
+    outdated = latest is not None and latest != current
+    return [
+        Status(
+            f"docker-base:{image}",
+            current,
+            latest or "?",
+            "docker-base",
+            outdated,
+            "" if latest else "fetch failed",
+        )
+    ]
+
+
 def main() -> int:
     report = {
         "pypi": [asdict(s) for s in check_pypi()],
         "uv": [asdict(s) for s in check_uv()],
         "actions": [asdict(s) for s in check_actions()],
+        "docker": [asdict(s) for s in (*check_docker_args(), *check_docker_base())],
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

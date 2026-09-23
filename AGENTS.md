@@ -41,6 +41,8 @@ plugins/mech/             # OpenHands plugin
 └── .plugin/plugin.json
 tests/
 scripts/
+docker/                 # mech-tools.Dockerfile + image digest lock
+examples/               # brief JSON used by docs and the image smoke check
 docs/adr/  docs/research/
 ```
 
@@ -94,7 +96,8 @@ docs/adr/  docs/research/
 ## Dependencies
 
 PyPI dependencies are pinned in `pyproject.toml` and `uv.lock`. When adding,
-removing, or moving a dependency, or starting to use a new external source
+removing, or moving a dependency, adding a version ARG or FROM image to
+`docker/mech-tools.Dockerfile`, or starting to use a new external source
 (other than PyPI), update in the same change: the checker logic in
 `scripts/check_dependency_updates.py` (and its tests) plus
 `docs/dependency-updates.md` and `docs/operations.md`, and run
@@ -102,6 +105,9 @@ removing, or moving a dependency, or starting to use a new external source
 workflow reports candidates to the "Dependency update check report" issue.
 For deferred candidates, record the reason and a re-check deadline in
 `scripts/dependency_update_deferrals.json`.
+
+Published image digests live in `docker/image-digests.json`, written only
+by `publish-mech-images.yml`; do not commit placeholder entries.
 
 ## Verification
 
