@@ -183,6 +183,7 @@ def export_design(
 
     provenance = {
         "schema_version": 1,
+        "license": "BSD-3-Clause",
         "design": name,
         "brief_sha256": brief_sha256(brief),
         "generator": design.provenance,
