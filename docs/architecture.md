@@ -43,7 +43,7 @@ output directory (verify-only, no regeneration).
   is therefore asserted at content level (3MF zip entries, DXF entity
   tokens) in `test_export_deterministic`, not byte level. Every file is
   sha256-recorded in `manifest.json` and verified by the manifest gate.
-- `provenance.json` pins `brief_sha256` + tool versions; the intake schema
+- `provenance.json` pins `license` + `brief_sha256` + tool versions; the intake schema
   binds part/feature provenance to R*/A* ids, and `check_intake` refuses a
   brief whose hash no longer matches.
 - Every gate check emits `{id, subject, status, measured, limit, detail}`.

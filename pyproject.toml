@@ -2,6 +2,7 @@
 name = "mech-agent"
 version = "0.1.0"
 description = "OpenHands plugin for conversational mechanical design (enclosures, mechanisms, brackets)"
+license = "BSD-3-Clause"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2",

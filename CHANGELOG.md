@@ -54,7 +54,9 @@ All notable changes to this project are documented here. The format follows
   (fastmcp-slim requires `mcp<2`) and Python 3.14 (unverified SDK/OCP
   wheel support).
 
-## [0.1.0] — first release
+## [0.1.0] — unreleased
+
+First public release (in preparation; no git tag published yet).
 
 ### Added
 
@@ -82,3 +84,6 @@ All notable changes to this project are documented here. The format follows
   `check_dependency_updates.py`, `bump_version.py`.
 - CI: verify matrix (3.12/3.13), plugin-load, zizmor workflow lint, weekly
   dependency-update report, manual release workflow, dependabot.
+
+[Unreleased]: https://github.com/VibeBB/mechanical-agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/VibeBB/mechanical-agent/releases/tag/v0.1.0

@@ -15,6 +15,15 @@ components the project depends on and how they are used.
 | openhands-tools 1.49.4 | MIT | SDK builtin tools used by sub-agents |
 | [ezdxf](https://github.com/mozman/ezdxf) (via build123d) | MIT | DXF export backend |
 
+## Container image components
+
+The `mech-tools` image bundles the following third-party components:
+
+| Component | License | Use |
+| --- | --- | --- |
+| uv (binary, copied from `ghcr.io/astral-sh/uv`) | Apache-2.0 OR MIT | Python environment and interpreter provisioning |
+| Ubuntu base image (`ubuntu:26.04`) | various (per-package copyrights in `/usr/share/doc/`) | base image + system libraries for OCP (mesa, X11, freetype) |
+
 ## Development tools
 
 | Tool | License |

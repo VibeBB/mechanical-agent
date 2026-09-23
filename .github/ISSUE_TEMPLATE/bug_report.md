@@ -9,6 +9,7 @@ labels: bug
 - OpenHands / Agent Canvas version:
 - mechanical-agent plugin version:
 - Installation source and ref:
+- Docker image digest (if applicable): <!-- e.g. from docker/image-digests.json -->
 - Operating system:
 
 ## Steps to reproduce
