@@ -1,13 +1,6 @@
 {
   "deferrals": [
     {
-      "surface": "pypi",
-      "name": "build123d",
-      "latest": "0.13.0",
-      "review_by": "2027-01-01",
-      "reason": "build123d>=0.13.0 requires threejs-materials>=1.2.1, which pins pillow>=12.2.0,<12.3.0; openhands-sdk==1.49.4 requires pillow>=12.3.0, so the two are unsatisfiable until the SDK loosens or drops the pillow bound. Re-check on the next openhands-sdk bump."
-    },
-    {
       "surface": "python-version",
       "name": "*",
       "latest": "3.14",
