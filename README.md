@@ -1,5 +1,11 @@
 # mechanical-agent (mech)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/VibeBB/mechanical-agent)
+
+[English](#english) | [日本語](#日本語)
+
+## English
+
 An [OpenHands](https://github.com/OpenHands) plugin for **conversational
 mechanical design**: it talks with the user in natural language to pin down
 requirements, records them in a machine-checked design brief, generates
@@ -16,7 +22,7 @@ LLMs, sub-agents, skills, and vision observations steer the work but can
 never promote anything to a pass — missing tools, parse failures, and
 unknowns are fail-closed.
 
-## What it designs (v0.1.0)
+### What it designs (v0.1.0)
 
 | Domain | Scope |
 | --- | --- |
@@ -28,10 +34,7 @@ unknowns are fail-closed.
 | Elements | ISO metric threads, bearing seats (standards tables) |
 | Drawings | DXF outlines alongside STEP/STL/3MF |
 
-Copyleft kernels (FreeCAD, OpenSCAD, CalculiX, gmsh) are deliberately not
-import-linked; see [docs/adr/ADR-0001](docs/adr/ADR-0001-cad-kernel.md).
-
-## Install
+### Install
 
 The plugin lives in `plugins/mech` and follows the OpenHands Software Agent
 SDK plugin layout (skills, agents, commands, hooks, `.mcp.json`). Point the
@@ -40,7 +43,7 @@ plugin store.
 
 Requires Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/).
 
-## Using the plugin
+### Using the plugin
 
 Commands (agent-facing):
 
@@ -59,7 +62,7 @@ The `mech` MCP server exposes deterministic tools (`mech_doctor`,
 `mech_author`, `mech_gates`) over stdio; `.mcp.json` resolves it through
 `scripts/mech_launcher.py`.
 
-## Using the core directly
+### Using the core directly
 
 ```bash
 uv sync
@@ -78,7 +81,7 @@ part), `*.3mf`, `*.dxf` outlines, `manifest.json` (sha256 of every file),
 `design-report.md` (per-check verdicts). If any gate is `fail` or
 `unknown`, the design verdict is `fail`.
 
-## Gate coverage
+### Gate coverage
 
 kernel validity · STEP round-trip volume match · mesh validity · part
 interference · board envelope & keepout · openings (residual-wall material)
@@ -87,7 +90,7 @@ mechanism rules (gear undercut/backlash, snap-fit strain/aspect, rib,
 boss, living hinge, detent) · ISO 286 fits vs declared intent · tolerance
 stackups · manifest sha256 integrity.
 
-## Repository layout
+### Repository layout
 
 ```text
 src/mech/                 # deterministic core (the only pass/fail authority)
@@ -97,7 +100,7 @@ scripts/                  # verify_all, e2e_authoring, check_plugin_load, dep ch
 docs/                     # architecture, operations, ADRs, research notes
 ```
 
-## Development
+### Development
 
 ```bash
 uv sync
@@ -107,12 +110,10 @@ uv run python scripts/verify_all.py --stage fast   # ruff + format + pyright + p
 See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/architecture.md](docs/architecture.md),
 and the ADR index in [docs/README.md](docs/README.md).
 
-## License
+### License
 
-BSD-3-Clause © Y.Yamashiro — see [LICENSE](LICENSE) and
+BSD-3-Clause © VibeBB — see [LICENSE](LICENSE) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
----
 
 ## 日本語
 
