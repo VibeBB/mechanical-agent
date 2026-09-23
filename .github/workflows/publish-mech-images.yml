@@ -218,7 +218,9 @@ jobs:
             --tag "$SERVER_TAG" --digest "$SERVER_DIGEST" --published-at "$published_at" \
             --workflow-run "$workflow_run" --dockerfile "sdk:openhands-agent-server/v${SDK_VERSION}" \
             --tools-json "$RUNNER_TEMP/mech-server.json"
-          if git diff --quiet -- docker/image-digests.json; then
+          # status --porcelain (not diff --quiet) so a still-untracked lock
+          # file on the very first publish is detected as a change too.
+          if [ -z "$(git status --porcelain -- docker/image-digests.json)" ]; then
             echo "Image digest lock is unchanged; no pull request is needed."
             exit 0
           fi
