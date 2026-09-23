@@ -317,8 +317,8 @@ jobs:
           # wait merges on its own once checks pass, so that is not a failure.
           merged=false
           for _ in $(seq 1 36); do
-            state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_url##*/}" --jq '.state')
-            [ "$state" = "closed" ] && { merged=true; break; }
+            merged_at=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_url##*/}" --jq '.merged_at // empty')
+            [ -n "$merged_at" ] && { merged=true; break; }
             sleep 10
           done
           if [ "$merged" != true ]; then
