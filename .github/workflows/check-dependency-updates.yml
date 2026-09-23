@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: check-dependency-updates
@@ -17,6 +16,10 @@ jobs:
   report:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # Posts, edits, and closes the "Dependency update check report" issue.
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

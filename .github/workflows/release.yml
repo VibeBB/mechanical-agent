@@ -27,6 +27,9 @@ jobs:
     # Covers the slow path: direct-push rejection → bump PR + dispatched
     # checks + merge wait.
     timeout-minutes: 45
+    # actions approves approval-gated runs and dispatches the bump-branch
+    # checks; contents pushes the bump commit (or its PR branch);
+    # pull-requests opens and merges the version-bump PR.
     permissions:
       actions: write
       contents: write
@@ -232,6 +235,7 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
+      # Creates the GitHub release and its v<version> tag.
       contents: write
     env:
       VERSION: ${{ needs.bump-version.outputs.version }}
