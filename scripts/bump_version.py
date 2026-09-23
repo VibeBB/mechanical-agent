@@ -76,6 +76,11 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--bump", choices=["patch", "minor", "major"])
     group.add_argument("--set", metavar="VERSION")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate version files and compute the target without writing",
+    )
     args = parser.parse_args(argv)
 
     root = Path(__file__).resolve().parents[1]
@@ -95,7 +100,8 @@ def main(argv: list[str] | None = None) -> int:
             target = f"{major}.{minor + 1}.0"
         else:
             target = f"{major}.{minor}.{patch + 1}"
-        _write_version(root, target)
+        if not args.dry_run:
+            _write_version(root, target)
     except BumpError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
