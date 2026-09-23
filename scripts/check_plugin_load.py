@@ -18,6 +18,7 @@ PLUGIN_DIR = REPO_ROOT / "plugins" / "mech"
 EXPECTED_AGENTS = {"mech-brief", "mech-design", "mech-review"}
 EXPECTED_SKILLS = {
     "mech-brief",
+    "mech-brief-rules",
     "mech-enclosure",
     "mech-mechanism",
     "mech-dfm",

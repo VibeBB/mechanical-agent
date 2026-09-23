@@ -46,6 +46,14 @@ def test_skill_frontmatter():
             assert marker in head, f"{skill.name} missing {marker}"
 
 
+def test_brief_rule_is_path_triggered():
+    head = (PLUGIN_ROOT / "skills" / "mech-brief-rules" / "SKILL.md").read_text(encoding="utf-8")[
+        :600
+    ]
+    assert "paths:" in head
+    assert "triggers:" not in head
+
+
 def test_agent_definitions():
     agents = sorted((PLUGIN_ROOT / "agents").glob("*.md"))
     assert {a.stem for a in agents} == {

@@ -1,6 +1,6 @@
 # Agent Working Agreement
 
-> Target: OpenHands Software Agent SDK v1.49.4, Python 3.12+
+> Target: OpenHands Software Agent SDK v1.49.5, Python 3.12+
 
 This document is the working agreement for implementation, verification, and
 documentation in this repository. The README is the product overview,
@@ -30,7 +30,8 @@ src/mech/                 # deterministic mechanical-design core
 ├── mcp_server.py         # stdio MCP boundary
 └── cli.py                # python -m mech {doctor,intake,author,gates,export}
 plugins/mech/             # OpenHands plugin
-├── skills/               # mech-brief, mech-enclosure, mech-mechanism,
+├── skills/               # mech-brief, mech-brief-rules, mech-enclosure,
+│                         # mech-mechanism,
 │                         # mech-dfm, mech-gates, mech-workflow
 ├── agents/               # mech-brief, mech-design, mech-review (task sub-agents)
 ├── commands/             # /mech:design, /mech:doctor, /mech:gates, /mech:export
@@ -79,6 +80,10 @@ docs/adr/  docs/research/
   propagate to sub-agents.
 - AgentDefinitions do not declare `skills:`; SKILL.md paths are referenced
   from prompts.
+- Skills use `triggers:` (`KeywordTrigger`). A `paths:` glob list makes
+  a skill a path-triggered rule instead (deterministic injection when a
+  matching file is touched); the two mechanisms are exclusive — keyword
+  skills stay model-invocable, rules live in their own `skills/` entries.
 - The `mech` MCP server exposes only deterministic entry points (the same
   functions `python -m mech` uses). It contains no agent logic.
 
