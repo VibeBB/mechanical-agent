@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   collected but unchecked) and renders the OK summary from the actual expected
   asset sets instead of a stale hardcoded string.
 
+### Added
+
+- `mech-brief` declares the `record-vision-tool-event` post hook in
+  frontmatter (plugin hooks do not propagate to task sub-agents).
+
 
 ### Added
 
