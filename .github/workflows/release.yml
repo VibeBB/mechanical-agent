@@ -82,8 +82,29 @@ jobs:
     with:
       ref: ${{ needs.bump-version.outputs.sha }}
 
+  install-smoke:
+    needs: bump-version
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.bump-version.outputs.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - name: Sync dependencies
+        run: uv sync --locked
+      - name: Smoke-test remote install
+        env:
+          REF: ${{ needs.bump-version.outputs.sha }}
+        run: >
+          uv run python scripts/smoke_install_plugin.py
+          --repo VibeBB/mechanical-agent --ref "$REF" --repo-path plugins/mech
+
   release:
-    needs: [bump-version, verify]
+    needs: [bump-version, verify, install-smoke]
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
