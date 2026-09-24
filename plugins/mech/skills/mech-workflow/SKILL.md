@@ -46,7 +46,11 @@ sub-agents through the SDK task tools (`TaskToolSet` + `AgentDefinition` +
 
 - `mech-brief` may read user-attached images (sketches, photos, drawings) via
   `inspect_image_with_vision`; adopted details become `A*`/`Q*` with the image as
-  source — never `R*`.
+  source — never `R*`. The `intake-attachments` hook materializes attached
+  images to `intake/attachments/<sha256[:12]>.<ext>` with a `manifest.jsonl`
+  provenance record; an A* or Q* record can bind one of those files via its
+  optional `evidence` field (`kind`, `path`, `sha256`, `note`) and
+  `check_intake` verifies the bytes — fail-closed.
 - `mech-review` inspects renders/projections with the model's own vision
   (`inspect_image_with_vision` covers only user-attached images, not workspace
   files); every vision call is
