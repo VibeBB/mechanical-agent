@@ -20,7 +20,7 @@ import shlex
 import sys
 from typing import Any, cast
 
-ARTIFACT_SUFFIXES = (".step", ".stp", ".stl", ".3mf", ".dxf")
+ARTIFACT_SUFFIXES = (".step", ".stp", ".stl", ".3mf", ".dxf", ".dxf_lint.json")
 ARTIFACT_NAMES = ("manifest.json", "provenance.json", "design-report.json")
 WRITE_TOOLS = {"file_editor", "apply_patch"}
 VIEW_ACTIONS = {"view", "read", "undo_edit"}

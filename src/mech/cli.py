@@ -103,6 +103,16 @@ def _cmd_export(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _cmd_dxf_lint(args: argparse.Namespace) -> dict[str, Any]:
+    from .dxf_lint import lint_file
+
+    report = lint_file(
+        Path(args.drawing),
+        Path(args.out) if args.out else None,
+    )
+    return report.model_dump(mode="json")
+
+
 def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = Path(args.out)
     try:
@@ -146,6 +156,13 @@ def build_parser() -> argparse.ArgumentParser:
     gates_p.add_argument("--brief", required=True)
     gates_p.add_argument("--out", required=True)
 
+    lint_p = sub.add_parser(
+        "dxf-lint",
+        help="advisory readability lint for a DXF drawing (never a gate verdict)",
+    )
+    lint_p.add_argument("--in", dest="drawing", required=True, help="DXF drawing to lint")
+    lint_p.add_argument("--out", default=None, help="optional report output path")
+
     envelope_p = sub.add_parser(
         "export-envelope",
         help="emit the wire-agent envelope contract",
@@ -168,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         "author": _cmd_author,
         "export": _cmd_export,
         "gates": _cmd_gates,
+        "dxf-lint": _cmd_dxf_lint,
     }
     handler = handlers[args.command]
     try:

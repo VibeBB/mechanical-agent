@@ -16,7 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from . import dxf_annotate
+from . import dxf_annotate, dxf_lint
 from .brief import DesignBrief, brief_sha256
 from .generators.common import GeneratedDesign, build123d
 
@@ -147,6 +147,14 @@ def export_design(
             exporter.write(str(dxf_path))
             dxf_annotate.annotate_dxf(dxf_path, design=name, part_id=part.part_id)
             record(dxf_path, "dxf", part.part_id)
+            lint_report = dxf_lint.lint_text(
+                dxf_path.read_text(encoding="utf-8", errors="replace"),
+                source=Path(dxf_path.name),
+            )
+            lint_out = lint_report.model_dump_json(indent=2) + "\n"
+            lint_path = out_dir / f"{dxf_path.name}_lint.json"
+            lint_path.write_text(lint_out, encoding="utf-8")
+            record(lint_path, "dxf_lint", part.part_id)
 
     mesher = b.Mesher()
     for part in design.parts:

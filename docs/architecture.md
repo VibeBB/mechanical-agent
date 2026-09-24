@@ -24,7 +24,8 @@ user conversation
       generate(brief)   ── build123d parametric parts + reference solids
       export(brief)     ── STEP/STL/3MF/DXF + manifest.json + provenance.json
                           (DXF outlines are annotated: frame, extents dims,
-                          hole diameters, title block)
+                          hole diameters, title block; each DXF also gets a
+                          *.dxf_lint.json advisory readability report)
       run_gates(brief)  ── GateCheck[] -> GateReport (verdict pass|fail)
       write_report()    ── design-report.json + design-report.md
 ```

@@ -26,10 +26,11 @@ src/mech/                 # deterministic mechanical-design core
 ├── gates.py              # authoritative gate runner
 ├── export.py             # STEP/STL/3MF/DXF + manifest/provenance
 ├── dxf_annotate.py       # DXF frame/dims/title block (deterministic overlay)
+├── dxf_lint.py           # advisory DXF readability lint (never a verdict)
 ├── report.py             # design-report.json/md
 ├── doctor.py             # environment probe
 ├── mcp_server.py         # stdio MCP boundary
-└── cli.py                # python -m mech {doctor,intake,author,gates,export}
+└── cli.py                # python -m mech {doctor,intake,author,gates,export,dxf-lint}
 plugins/mech/             # OpenHands plugin
 ├── skills/               # mech-brief, mech-brief-rules, mech-enclosure,
 │                         # mech-mechanism,
