@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..brief import DesignBrief, EnclosureSpec, Opening
+from ..brief import (
+    DesignBrief,
+    EnclosureSpec,
+    Opening,
+    standoff_diameters,
+    vent_slot_count,
+)
 from ..standards import thread
 from .common import GeneratedDesign, GeneratedPart, ReferenceSolid, build123d
 
@@ -19,15 +25,7 @@ SNAP_FIT_GAP_MM = 0.2  # radial gap between lid skirt and shell cavity
 WELD_MM = 0.1  # overlap depth to keep unions off coincident faces
 
 
-def standoff_geometry(hole_diameter_mm: float) -> tuple[float, float]:
-    """(outer_diameter, pilot_diameter) for a board standoff.
-
-    The pilot is the self-tapping/tap drill for the board screw: the board
-    clearance hole minus 0.7 mm (e.g. a 3.2 mm M3 hole yields a 2.5 mm M3
-    tap drill), never smaller than 1.0 mm.
-    """
-    pilot = max(1.0, hole_diameter_mm - 0.7)
-    return hole_diameter_mm + 3.0, pilot
+standoff_geometry = standoff_diameters
 
 
 def _outer_solid(spec: EnclosureSpec, height_mm: float) -> Any:
@@ -95,9 +93,7 @@ def _vent_prisms(spec: EnclosureSpec) -> list[Any]:
         return []
     b = build123d()
     vent = spec.vent
-    face_w, _face_h = _vent_face_span(spec, vent.face)
-    usable = face_w - 2 * vent.margin_mm
-    count = max(1, int((usable - vent.slot_width_mm) // vent.slot_pitch_mm) + 1)
+    count = vent_slot_count(spec)
     start = -(count - 1) * vent.slot_pitch_mm / 2
     depth = spec.wall_mm + CUT_OVER_MM
     prisms: list[Any] = []
@@ -129,14 +125,6 @@ def _vent_prisms(spec: EnclosureSpec) -> list[Any]:
                 b.Pos(x_face, x, z_mid) * b.Box(depth, vent.slot_width_mm, vent.slot_length_mm)
             )
     return prisms
-
-
-def _vent_face_span(spec: EnclosureSpec, face: str) -> tuple[float, float]:
-    if face in ("front", "back"):
-        return spec.width_mm, spec.height_mm - spec.floor_mm
-    if face in ("left", "right"):
-        return spec.depth_mm, spec.height_mm - spec.floor_mm
-    return spec.width_mm, spec.depth_mm
 
 
 def _build_shell(spec: EnclosureSpec, shell_height: float) -> Any:

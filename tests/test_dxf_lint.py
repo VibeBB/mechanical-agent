@@ -116,6 +116,119 @@ def test_annotated_dxf_carries_notes_hole_table_and_fits(
     assert report.verdict == "pass", report.findings
 
 
+def _wide_enclosure_brief() -> DesignBrief:
+    """A wide, shallow enclosure — the aspect ratio that used to push the
+    documentation column outside the frame."""
+    return DesignBrief.model_validate(
+        {
+            "name": "widecase",
+            "design_type": "enclosure",
+            "material": "ABS",
+            "process": "fdm",
+            "enclosure": {
+                "width_mm": 400,
+                "depth_mm": 60,
+                "height_mm": 50,
+                "wall_mm": 2.0,
+                "floor_mm": 2.0,
+                "lid": "screw",
+                "corner_radius_mm": 4.0,
+                "clearance_mm": 0.5,
+                "standoff_height_mm": 8.0,
+                "board": {
+                    "width_mm": 120,
+                    "depth_mm": 40,
+                    "mount_holes": [
+                        {"id": "MH1", "x_mm": -50, "y_mm": -15, "diameter_mm": 3.2},
+                        {"id": "MH2", "x_mm": 50, "y_mm": -15, "diameter_mm": 3.2},
+                        {"id": "MH3", "x_mm": -50, "y_mm": 15, "diameter_mm": 3.2},
+                        {"id": "MH4", "x_mm": 50, "y_mm": 15, "diameter_mm": 3.2},
+                    ],
+                },
+                "openings": [
+                    {
+                        "id": "O1",
+                        "face": "front",
+                        "kind": "rect",
+                        "width_mm": 20,
+                        "height_mm": 8,
+                        "center_x_mm": -150,
+                    },
+                    {
+                        "id": "O2",
+                        "face": "front",
+                        "kind": "rect",
+                        "width_mm": 20,
+                        "height_mm": 8,
+                        "center_x_mm": -100,
+                    },
+                    {
+                        "id": "O3",
+                        "face": "top",
+                        "kind": "round",
+                        "width_mm": 12,
+                        "height_mm": 12,
+                        "center_x_mm": 100,
+                    },
+                ],
+                "vent": {
+                    "face": "top",
+                    "slot_width_mm": 4.0,
+                    "slot_length_mm": 30.0,
+                    "slot_pitch_mm": 10.0,
+                    "margin_mm": 20.0,
+                },
+                "screw": {"size": "M4", "boss_diameter_mm": 9.0},
+            },
+        }
+    )
+
+
+def _layer_texts(dxf_path: Path) -> dict[str, list[str]]:
+    doc = ezdxf.readfile(str(dxf_path))
+    texts: dict[str, list[str]] = {}
+    for entity in doc.modelspace():
+        if entity.dxftype() == "TEXT":
+            texts.setdefault(entity.dxf.layer, []).append(entity.dxf.text)
+    return texts
+
+
+def test_wide_part_documentation_column_stays_inside_frame(tmp_path: Path):
+    brief = _wide_enclosure_brief()
+    out_dir = tmp_path / "out"
+    export_design(brief, generate(brief), out_dir)
+    for dxf_path in sorted(out_dir.glob("*.dxf")):
+        report = lint_text(dxf_path.read_text(encoding="utf-8", errors="replace"), source=dxf_path)
+        assert report.verdict == "pass", report.findings
+        assert report.warnings == 0, [
+            f.description for f in report.findings if f.severity == "warning"
+        ]
+
+
+def test_contract_tables_land_on_the_part_that_owns_them(tmp_path: Path):
+    brief = _wide_enclosure_brief()
+    out_dir = tmp_path / "out"
+    export_design(brief, generate(brief), out_dir)
+    shell = _layer_texts(out_dir / "widecase-shell.dxf")
+    lid = _layer_texts(out_dir / "widecase-lid.dxf")
+    shell_notes = " ".join(shell.get("NOTES", []))
+    lid_notes = " ".join(lid.get("NOTES", []))
+    # Front-face openings are cut in the shell; the top vent and round top
+    # opening are cut in the lid.
+    assert "OPENINGS TABLE" in shell_notes
+    assert "O1" in shell_notes and "O2" in shell_notes
+    assert "O3" not in shell_notes
+    assert "O3" in lid_notes
+    assert "VENT top" in lid_notes
+    assert "VENT" not in shell_notes
+    # Board standoffs belong to the shell.
+    assert "BOARD MOUNT TABLE" in shell_notes
+    assert "MH1" in shell_notes
+    assert "BOARD MOUNT" not in lid_notes
+    # Title blocks carry the revision row.
+    assert "REV     A" in " ".join(shell.get("TITLE", []))
+
+
 def test_design_report_embeds_lint_advisory(enclosure_brief: DesignBrief, tmp_path: Path):
     out_dir = tmp_path / "out"
     design = generate(enclosure_brief)

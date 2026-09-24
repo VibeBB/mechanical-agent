@@ -1,10 +1,11 @@
 """Post-process OCCT outline DXFs into annotated drawings.
 
-Adds a drawing frame, overall linear dimensions, hole diameter callouts, a
-hole table with datum coordinates, center marks and hole tags, a notes block,
-and a title block to each per-part DXF, using plain LINE/LWPOLYLINE/TEXT
-entities (no associative DIMENSION/dimstyle dependency) so output stays
-byte-stable.
+Adds a drawing frame, overall linear dimensions, hole diameter callouts,
+datum-coordinate tables for holes plus the contract features a top outline
+cannot show (wall openings, board-mount pilots, vent slots), center marks
+and hole tags, a notes block, and a title block to each per-part DXF, using
+plain LINE/LWPOLYLINE/TEXT entities (no associative DIMENSION/dimstyle
+dependency) so output stays byte-stable.
 """
 
 # ezdxf's annotations are only partially typed.
@@ -22,11 +23,21 @@ import ezdxf
 from ezdxf import bbox
 
 from . import __version__
-from .brief import FitDeclaration
+from .brief import (
+    EnclosureSpec,
+    FitDeclaration,
+    Opening,
+    standoff_diameters,
+    vent_slot_count,
+)
 
 _FRAME_MARGIN_RATIO = 0.08
 _TEXT_HEIGHT_RATIO = 0.030
 _MIN_TEXT_HEIGHT_MM = 1.2
+# Body text never grows past the top of the ISO 3098 size series used on
+# drawings (7 mm); on large parts proportional text would balloon the
+# documentation column and the sheet it must fit into.
+_MAX_TEXT_HEIGHT_MM = 7.0
 _ARROW_RATIO = 0.30
 _DIAMETER_ANGLE_DEG = 45.0
 # ezdxf stamps wall-clock datetimes, version banners, and placeholder GUIDs;
@@ -148,12 +159,30 @@ def hole_circles(msp: Any) -> list[tuple[float, float, float]]:
     return sorted(holes)
 
 
-def _inside(
-    point: tuple[float, float],
-    rect: tuple[tuple[float, float], tuple[float, float]],
-) -> bool:
+def _text_extent(
+    content: str, point: tuple[float, float], height: float
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Estimated text bounding rect, matching dxf_lint's own estimate."""
+    width = max(len(content), 1) * height * 0.7
+    return point, (point[0] + width, point[1] + height * 1.4)
+
+
+def _inflate(
+    rect: tuple[tuple[float, float], tuple[float, float]], pad: float
+) -> tuple[tuple[float, float], tuple[float, float]]:
     (x0, y0), (x1, y1) = rect
-    return x0 <= point[0] <= x1 and y0 <= point[1] <= y1
+    return (x0 - pad, y0 - pad), (x1 + pad, y1 + pad)
+
+
+def _rects_overlap(
+    a: tuple[tuple[float, float], tuple[float, float]],
+    b: tuple[tuple[float, float], tuple[float, float]],
+) -> bool:
+    """True when two rects share more than a hairline sliver — same
+    0.05 mm^2 epsilon dxf_lint uses so placements pre-dodge its findings."""
+    width = min(a[1][0], b[1][0]) - max(a[0][0], b[0][0])
+    height = min(a[1][1], b[1][1]) - max(a[0][1], b[0][1])
+    return width > 0 and height > 0 and width * height > 0.05
 
 
 def _diameter_dims(
@@ -162,13 +191,15 @@ def _diameter_dims(
     height: float,
     arrow: float,
     layer: str,
-    blocked: tuple[tuple[float, float], tuple[float, float]] | None = None,
+    blocked: list[tuple[tuple[float, float], tuple[float, float]]] | None = None,
 ) -> None:
     rad = math.radians(_DIAMETER_ANGLE_DEG)
     ux, uy = math.cos(rad), math.sin(rad)
+    placed: list[tuple[tuple[float, float], tuple[float, float]]] = []
     for index, (cx, cy, r) in enumerate(holes):
         # Alternate the label side so labels on neighboring holes do not
-        # collide, then dodge the title block if one was provided.
+        # collide, then dodge blocked regions (title/notes blocks, hole
+        # tags, labels already placed).
         side = 1 if index % 2 == 0 else -1
         candidates = [
             (cx + side * ux * (r + height), cy + uy * (r + height)),
@@ -178,19 +209,25 @@ def _diameter_dims(
             (cx - side * ux * (r + 3 * height), cy + uy * (r + 3 * height)),
             (cx, cy + r + 4 * height),
             (cx + side * ux * (r + 5 * height), cy + uy * (r + 5 * height)),
+            (cx - side * ux * (r + 5 * height), cy - uy * (r + 5 * height)),
+            (cx, cy - r - 5 * height),
         ]
+        content = f"%%c{_fmt(2 * r)}"
         text_pos = candidates[0]
-        if blocked is not None:
+        regions = (blocked or []) + placed
+        if regions:
             for candidate in candidates:
-                if not _inside(candidate, blocked):
+                box = _text_extent(content, candidate, height)
+                if not any(_rects_overlap(box, region) for region in regions):
                     text_pos = candidate
                     break
+        placed.append(_text_extent(content, text_pos, height))
         p1 = (cx - ux * r, cy - uy * r)
         p2 = (cx + ux * r, cy + uy * r)
         _line(msp, p1, p2, layer)
         _arrow(msp, p1, math.degrees(rad) + 180, arrow, layer)
         _arrow(msp, p2, math.degrees(rad), arrow, layer)
-        _text(msp, f"%%c{_fmt(2 * r)}", text_pos, height, layer)
+        _text(msp, content, text_pos, height, layer)
 
 
 # General-tolerance note per process — machining and sheet metal cite the
@@ -203,6 +240,7 @@ _GENERAL_TOLERANCE_NOTE: dict[str, str] = {
     "sheet_metal": "GEN TOL ISO 2768-c",
 }
 _DEBURR_PROCESSES = {"machining", "sheet_metal"}
+_FINISH_NOTE: dict[str, str] = {"machining": "FINISH Ra 3.2"}
 # Row pitch must stay above dxf_lint's text-line estimate (1.4x height) or
 # stacked rows collide; the size caps below yield to this floor.
 _MIN_ROW_PITCH = 1.55
@@ -219,14 +257,22 @@ def _hole_tag(hole_index: int) -> str:
     return f"A{hole_index + 1}"
 
 
+def _part_openings(spec: EnclosureSpec, part_id: str) -> list[Opening]:
+    """Openings the generated part owns: the lid carries the top face,
+    the shell every other face (mirrors generators/enclosure.py)."""
+    return [o for o in spec.openings if (o.face == "top") == (part_id == "lid")]
+
+
 def _notes_rows(
     *,
     holes: list[tuple[float, float, float]],
     datum: tuple[float, float],
     process: str | None,
     fits: list[FitDeclaration],
+    enclosure: EnclosureSpec | None = None,
+    part_id: str = "",
 ) -> list[str]:
-    """General notes + hole table rows (top-down), all contract-derived."""
+    """General notes + contract tables (top-down), all contract-derived."""
     rows: list[str] = []
     if holes:
         rows.append("HOLE TABLE")
@@ -236,18 +282,68 @@ def _notes_rows(
                 f"{_hole_tag(index):<5} %%c{_fmt(2 * r):<5} "
                 f"X{_fmt(cx - datum[0])} Y{_fmt(cy - datum[1])}"
             )
+    openings = _part_openings(enclosure, part_id) if enclosure is not None else []
+    if openings:
+        rows.append("OPENINGS TABLE")
+        rows.append("OPEN  FACE    SIZE      CX     CY")
+        for opening in openings:
+            size = (
+                f"{_fmt(opening.width_mm)}x{_fmt(opening.height_mm)}"
+                if opening.kind == "rect"
+                else f"%%c{_fmt(opening.width_mm)}"
+            )
+            rows.append(
+                f"{opening.id:<5} {opening.face:<7} {size:<9} "
+                f"CX{_fmt(opening.center_x_mm)} CY{_fmt(opening.center_y_mm)}"
+            )
+    mount_holes = (
+        enclosure.board.mount_holes
+        if enclosure is not None and enclosure.board is not None and part_id == "shell"
+        else []
+    )
+    if mount_holes:
+        # Board mount holes are contract features; the table ties their ids
+        # to the drilled pilot (what the standoff actually receives, not the
+        # board clearance diameter) and its datum coordinates.
+        rows.append("BOARD MOUNT TABLE")
+        rows.append("HOLE  PILOT X     Y")
+        for hole in mount_holes:
+            rows.append(
+                f"{hole.id:<5} %%c{_fmt(standoff_diameters(hole.diameter_mm)[1]):<5} "
+                f"X{_fmt(hole.x_mm - datum[0])} "
+                f"Y{_fmt(hole.y_mm - datum[1])}"
+            )
     n = 0
     rows.append("NOTES")
     n += 1
     rows.append(f"{n}. UNITS mm")
     n += 1
     rows.append(f"{n}. {_GENERAL_TOLERANCE_NOTE.get(process or '', 'GEN TOL ISO 2768-m')}")
-    if holes:
+    if holes or mount_holes:
         n += 1
         rows.append(f"{n}. HOLE X/Y FROM LOWER-LEFT EDGE")
+    if openings:
+        n += 1
+        rows.append(f"{n}. OPENING CX/CY FROM FACE CENTER")
+    if (
+        enclosure is not None
+        and enclosure.vent is not None
+        and (enclosure.vent.face == "top") == (part_id == "lid")
+    ):
+        vent = enclosure.vent
+        n += 1
+        rows.append(
+            f"{n}. VENT {vent.face} {vent_slot_count(enclosure)} SLOTS "
+            f"{_fmt(vent.slot_width_mm)}x{_fmt(vent.slot_length_mm)} "
+            f"@{_fmt(vent.slot_pitch_mm)}P MARGIN {_fmt(vent.margin_mm)}"
+        )
     if (process or "") in _DEBURR_PROCESSES:
         n += 1
         rows.append(f"{n}. DEBURR EDGES")
+    finish = _FINISH_NOTE.get(process or "")
+    if finish is not None:
+        n += 1
+        rows.append(f"{n}. {finish}")
     for fit in fits:
         n += 1
         rows.append(
@@ -301,6 +397,24 @@ def _notes_block(
     return (x0, y0), (frame_max[0], box_top)
 
 
+def _title_rows(
+    design: str,
+    part_id: str,
+    material: str | None,
+    process: str | None,
+) -> list[str]:
+    return [
+        f"DESIGN  {design}",
+        f"PART    {part_id}",
+        *([f"MATERIAL {material}"] if material is not None else []),
+        *([f"PROCESS  {process}"] if process is not None else []),
+        "SCALE   1:1   UNITS mm",
+        "REV     A",
+        f"GENERATOR mech {__version__}",
+        "FORMAT  outline (top)",
+    ]
+
+
 def _title_block(
     msp: Any,
     frame_min: tuple[float, float],
@@ -313,15 +427,7 @@ def _title_block(
     height: float,
     layer: str,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    rows = [
-        f"DESIGN  {design}",
-        f"PART    {part_id}",
-        *([f"MATERIAL {material}"] if material is not None else []),
-        *([f"PROCESS  {process}"] if process is not None else []),
-        "SCALE   1:1   UNITS mm",
-        f"GENERATOR mech {__version__}",
-        "FORMAT  outline (top)",
-    ]
+    rows = _title_rows(design, part_id, material, process)
     row_h = height * 1.6
     box_h = row_h * len(rows)
     frame_h = frame_max[1] - frame_min[1]
@@ -362,6 +468,7 @@ def annotate_dxf(
     material: str | None = None,
     process: str | None = None,
     fits: list[FitDeclaration] | None = None,
+    enclosure: EnclosureSpec | None = None,
 ) -> None:
     """Draw a frame, overall extents dimensions, hole diameters + a hole
     table, center marks, a notes block, and a title block into the DXF at
@@ -373,7 +480,7 @@ def annotate_dxf(
     h = ext.extmax.y - ext.extmin.y
     span = max(w, h)
     margin = span * _FRAME_MARGIN_RATIO
-    height = max(span * _TEXT_HEIGHT_RATIO, _MIN_TEXT_HEIGHT_MM)
+    height = min(max(span * _TEXT_HEIGHT_RATIO, _MIN_TEXT_HEIGHT_MM), _MAX_TEXT_HEIGHT_MM)
     arrow = height * 1.9
 
     for layer_name, color in (("FRAME", 8), ("DIMS", 1), ("TITLE", 4), ("NOTES", 3)):
@@ -391,6 +498,8 @@ def annotate_dxf(
         datum=(ext.extmin.x, ext.extmin.y),
         process=process,
         fits=fits or [],
+        enclosure=enclosure,
+        part_id=part_id,
     )
     # Right-hand documentation column: the frame widens past the part's
     # margin by exactly the notes block's width, so notes and the hole
@@ -398,6 +507,15 @@ def annotate_dxf(
     # column's bottom-right corner.
     notes_w = (max(len(row) for row in notes_rows) + 2) * height * 0.95
     fx1 += margin * 0.4 + notes_w
+    # The sheet must also fit the column vertically: when the title and
+    # notes stacks together exceed the frame height (wide, short parts),
+    # grow the frame upward — the extra sheet area sits above the part,
+    # like an oversized sheet around a small drawing.
+    stack_h = (
+        len(notes_rows) + len(_title_rows(design, part_id, material, process))
+    ) * height * 1.6 + height * 1.5
+    if stack_h > fy1 - fy0:
+        fy1 += stack_h - (fy1 - fy0)
     msp.add_lwpolyline(
         [(fx0, fy0), (fx1, fy0), (fx1, fy1), (fx0, fy1)],
         close=True,
@@ -425,7 +543,7 @@ def annotate_dxf(
         arrow=arrow,
         layer="DIMS",
     )
-    blocked = _title_block(
+    title_rect = _title_block(
         msp,
         (fx0, fy0),
         (fx1, fy1),
@@ -443,25 +561,27 @@ def annotate_dxf(
         notes_rows,
         frame_min=(fx0, fy0),
         frame_max=(fx1, fy1),
-        anchor_top=blocked[1][1],
+        anchor_top=title_rect[1][1],
         height=height,
         layer="NOTES",
     )
-    blocked = (
-        (min(blocked[0][0], notes_rect[0][0]), blocked[0][1]),
-        (max(blocked[1][0], notes_rect[1][0]), notes_rect[1][1]),
-    )
-    _diameter_dims(msp, holes, height, arrow, "DIMS", blocked)
+    blocked = [
+        (
+            (min(title_rect[0][0], notes_rect[0][0]), title_rect[0][1]),
+            (max(title_rect[1][0], notes_rect[1][0]), notes_rect[1][1]),
+        )
+    ]
+    # Center marks and hole tags go down first so their positions join the
+    # blocked regions the diameter labels dodge.
     for index, (cx, cy, r) in enumerate(holes):
         _center_mark(msp, cx, cy, r, height, "DIMS")
         tag = _hole_tag(index)
-        _text(
-            msp,
-            tag,
-            (cx - r - height * 0.4 - len(tag) * height * 0.7, cy - height * 0.5),
-            height,
-            "DIMS",
-        )
+        insert = (cx - r - height * 0.4 - len(tag) * height * 0.7, cy - height * 0.5)
+        _text(msp, tag, insert, height, "DIMS")
+        # The blocked region is padded so a diameter label never lands
+        # flush against a tag — touching text reads as one word on paper.
+        blocked.append(_inflate(_text_extent(tag, insert, height), height * 0.5))
+    _diameter_dims(msp, holes, height, arrow, "DIMS", blocked)
 
     doc.header["$TDCREATE"] = 0.0
     doc.header["$TDUPDATE"] = 0.0

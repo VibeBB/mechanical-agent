@@ -158,6 +158,32 @@ def face_span(spec: EnclosureSpec, face: str) -> tuple[float, float]:
     return spec.width_mm, spec.depth_mm
 
 
+def standoff_diameters(hole_diameter_mm: float) -> tuple[float, float]:
+    """(outer_diameter, pilot_diameter) for a board standoff.
+
+    The pilot is the self-tapping/tap drill for the board screw: the board
+    clearance hole minus 0.7 mm (e.g. a 3.2 mm M3 hole yields a 2.5 mm M3
+    tap drill), never smaller than 1.0 mm.
+    """
+    pilot = max(1.0, hole_diameter_mm - 0.7)
+    return hole_diameter_mm + 3.0, pilot
+
+
+def vent_slot_count(spec: EnclosureSpec) -> int:
+    """Number of slots a vent grid places on its face (contract value)."""
+    if spec.vent is None:
+        return 0
+    vent = spec.vent
+    if vent.face in ("front", "back"):
+        face_w = spec.width_mm
+    elif vent.face in ("left", "right"):
+        face_w = spec.depth_mm
+    else:
+        face_w = spec.width_mm
+    usable = face_w - 2 * vent.margin_mm
+    return max(1, int((usable - vent.slot_width_mm) // vent.slot_pitch_mm) + 1)
+
+
 class BracketHole(BaseModel):
     """A drilled hole on one bracket face, face-local coordinates at centre."""
 

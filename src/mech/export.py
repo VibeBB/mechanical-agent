@@ -152,6 +152,7 @@ def export_design(
                 material=brief.material,
                 process=brief.process,
                 fits=brief.fits,
+                enclosure=brief.enclosure,
             )
             record(dxf_path, "dxf", part.part_id)
             lint_report = dxf_lint.lint_text(
