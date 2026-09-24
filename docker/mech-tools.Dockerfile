@@ -1,7 +1,7 @@
 ARG UV_VERSION=0.12.18
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
-FROM ubuntu:26.04
+FROM debian:13-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG UV_VERSION=0.12.18
@@ -21,14 +21,7 @@ LABEL org.opencontainers.image.source="https://github.com/VibeBB/mechanical-agen
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-# Serve every suite from the master archive: it carries the same -security
-# pocket, while security.ubuntu.com can briefly publish an index ahead of its
-# pool and 404 packages the index still lists.
-RUN grep -q "^URIs: http://security\.ubuntu\.com/ubuntu" \
-        /etc/apt/sources.list.d/ubuntu.sources \
-    && sed -i "s|^URIs: http://security\.ubuntu\.com/ubuntu/|URIs: http://archive.ubuntu.com/ubuntu/|" \
-        /etc/apt/sources.list.d/ubuntu.sources \
-    && apt-get -o Acquire::Retries=5 update \
+RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install --no-install-recommends -y \
         ca-certificates \
         curl \
@@ -40,7 +33,7 @@ RUN grep -q "^URIs: http://security\.ubuntu\.com/ubuntu" \
         libxi6 \
         libxmu6 \
         libxrender1 \
-        libxt6 \
+        libxt6t64 \
         libxext6 \
         libfreetype6 \
         libfontconfig1 \
