@@ -260,7 +260,7 @@ def _run_vision(payload: dict[str, Any]) -> subprocess.CompletedProcess[str]:
 
 
 def _vision_events(tmp_path: Path) -> list[dict[str, Any]]:
-    path = tmp_path / ".openhands" / "mech" / "vision-tool-events.jsonl"
+    path = tmp_path / "observations" / "mech" / "vision-tool-events.jsonl"
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
@@ -346,7 +346,7 @@ def _run_observe(payload: dict[str, Any]) -> subprocess.CompletedProcess[str]:
 
 
 def _observations(tmp_path: Path) -> list[dict[str, Any]]:
-    path = tmp_path / ".openhands" / "mech" / "image-observations.jsonl"
+    path = tmp_path / "observations" / "mech" / "image-observations.jsonl"
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]

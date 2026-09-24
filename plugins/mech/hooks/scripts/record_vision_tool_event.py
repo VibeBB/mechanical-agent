@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, cast
 
 EVENTS_ENV = "MECH_VISION_TOOL_EVENTS"
-EVENTS_RELATIVE_PATH = Path(".openhands/mech/vision-tool-events.jsonl")
+EVENTS_RELATIVE_PATH = Path("observations/mech/vision-tool-events.jsonl")
 VISION_TOOL_NAME = "inspect_image_with_vision"
 
 

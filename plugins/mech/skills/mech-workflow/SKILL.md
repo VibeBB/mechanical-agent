@@ -54,4 +54,4 @@ sub-agents through the SDK task tools (`TaskToolSet` + `AgentDefinition` +
 - `mech-review` inspects renders/projections with the model's own vision
   (`inspect_image_with_vision` covers only user-attached images, not workspace
   files); every vision call is
-  hashed into `.openhands/mech/vision-tool-events.jsonl` by the post_tool_use hook.
+  hashed into `observations/mech/vision-tool-events.jsonl` by the post_tool_use hook.

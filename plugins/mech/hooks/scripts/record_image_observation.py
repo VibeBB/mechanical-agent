@@ -4,7 +4,7 @@ Companion to record_vision_tool_event.py: that hook logs delegated
 inspect_image_with_vision calls; this one logs direct image observations —
 `file_editor` `view` commands on image files and `mech_render` tool results
 mentioning rendered image paths. Each observation is appended to
-`.openhands/mech/image-observations.jsonl` as
+`observations/mech/image-observations.jsonl` as
 {sequence, event_id, tool_name, image_path, image_sha256, recorded_at,
 session_id} so every image the model saw has a provenance record.
 """
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, cast
 
 EVENTS_ENV = "MECH_IMAGE_OBSERVATIONS"
-EVENTS_RELATIVE_PATH = Path(".openhands/mech/image-observations.jsonl")
+EVENTS_RELATIVE_PATH = Path("observations/mech/image-observations.jsonl")
 OBSERVED_TOOLS = {"mech_render", "file_editor"}
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
 _IMAGE_PATH = re.compile(r"[^\s\"'<>]+?\.(?:png|jpe?g)", re.IGNORECASE)
