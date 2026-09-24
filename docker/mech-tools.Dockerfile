@@ -37,6 +37,7 @@ RUN apt-get update \
         libxext6 \
         libfreetype6 \
         libfontconfig1 \
+        librsvg2-bin \
     && rm -rf /var/lib/apt/lists/*
 
 RUN uv python install 3.12 \
@@ -56,6 +57,7 @@ RUN cd /opt/mech \
     && uv pip install --python /opt/mech/.venv/bin/python --no-deps /opt/mech \
     && python -c "import build123d, mech, pydantic; print(mech.__version__)" \
     && python -m mech doctor \
+    && rsvg-convert --version \
     && rm -f /tmp/mech-requirements.txt
 
 RUN if ! getent group mech >/dev/null; then groupadd mech; fi \

@@ -59,6 +59,14 @@ def test_protect_denies_artifact_writes() -> None:
         },
         {
             "tool_name": "file_editor",
+            "tool_input": {"command": "create", "path": "out/part.svg"},
+        },
+        {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "write", "path": "out/part.png"},
+        },
+        {
+            "tool_name": "file_editor",
             "tool_input": {"command": "write", "path": "out/manifest.json"},
         },
         {
@@ -97,6 +105,14 @@ def test_protect_allows_reads_and_unprotected_writes() -> None:
             "tool_name": "terminal",
             "tool_input": {"command": "python -m mech author --brief b.brief.json"},
         },
+        {
+            "tool_name": "terminal",
+            "tool_input": {"command": "python -m mech render --dxf out/part.dxf"},
+        },
+        {
+            "tool_name": "terminal",
+            "tool_input": {"command": "rsvg-convert -d 200 part.svg -o part.png"},
+        },
     ):
         assert _run_protect(payload).returncode == 0, payload
 
@@ -108,6 +124,8 @@ def test_protect_denies_terminal_artifact_writes() -> None:
         "cat a | tee out.3mf",
         "cp template out.dxf",
         "mv draft.step final.step",
+        "cp a.png out/part.png",
+        "rm out/render.svg",
         "dd of=out.step",
         "sed -i s/a/b/ out.stl",
         "touch out.step",

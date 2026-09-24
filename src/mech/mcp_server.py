@@ -9,6 +9,7 @@ CAD stack degrade to a fail-closed error result, not a crash.
 from __future__ import annotations
 
 import asyncio
+import base64
 import dataclasses
 import json
 from pathlib import Path
@@ -113,6 +114,17 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["drawing_path"],
         "additionalProperties": False,
     },
+    "mech_render": {
+        "type": "object",
+        "properties": {
+            "dxf_path": {"type": "string"},
+            "out_path": {"type": "string"},
+            "dpi": {"type": "integer", "exclusiveMinimum": 0},
+            "baseline_path": {"type": "string"},
+        },
+        "required": ["dxf_path"],
+        "additionalProperties": False,
+    },
 }
 
 _DESCRIPTIONS = {
@@ -127,6 +139,10 @@ _DESCRIPTIONS = {
         "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
     ),
     "mech_dxf_lint": "Advisory readability lint for a DXF drawing (never a gate verdict).",
+    "mech_render": (
+        "Rasterize an exported DXF to PNG for the advisory vision lane; "
+        "optional sha256 visual baseline compare."
+    ),
 }
 
 
@@ -155,6 +171,20 @@ def _error(reason: str) -> types.CallToolResult:
         ],
         isError=True,
     )
+
+
+_IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+
+
+def _image_content(path: Path) -> types.ImageContent | None:
+    mime = _IMAGE_MIME.get(path.suffix.lower())
+    if mime is None or not path.is_file():
+        return None
+    try:
+        data = base64.b64encode(path.read_bytes()).decode("ascii")
+    except OSError:
+        return None
+    return types.ImageContent(type="image", data=data, mimeType=mime)
 
 
 def _standards_payload(kind: str) -> dict[str, Any]:
@@ -270,6 +300,37 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
                 Path(arguments["output_path"]) if arguments.get("output_path") else None,
             )
             return _ok(report.model_dump(mode="json"))
+        if name == "mech_render":
+            from .render import render_dxf
+
+            render = render_dxf(
+                Path(arguments["dxf_path"]),
+                Path(arguments["out_path"]) if arguments.get("out_path") else None,
+                dpi=int(arguments.get("dpi", 200)),
+                baseline_path=(
+                    Path(arguments["baseline_path"]) if arguments.get("baseline_path") else None
+                ),
+            )
+            payload: dict[str, Any] = {
+                "verdict": "pass",
+                "dxf_path": render.dxf_path,
+                "svg_path": render.svg_path,
+                "png_path": render.png_path,
+                "image_sha256": render.image_sha256,
+            }
+            if render.baseline is not None:
+                payload["baseline"] = render.baseline
+                payload["baseline_sha256"] = render.baseline_sha256
+            content: list[types.ContentBlock] = [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                )
+            ]
+            image = _image_content(Path(render.png_path))
+            if image is not None:
+                content.append(image)
+            return types.CallToolResult(content=content)
         return _error(f"unknown mech tool: {name}")
     except Exception as exc:  # fail-closed transport boundary
         return _error(str(exc))
@@ -295,6 +356,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_gates": _anno("Re-run gates", write=True),
     "mech_export_envelope": _anno("Export envelope contract", write=True),
     "mech_dxf_lint": _anno("DXF lint", write=False),
+    "mech_render": _anno("Render DXF to PNG", write=True),
 }
 
 

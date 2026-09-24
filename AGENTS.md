@@ -27,10 +27,12 @@ src/mech/                 # deterministic mechanical-design core
 ├── export.py             # STEP/STL/3MF/DXF + manifest/provenance
 ├── dxf_annotate.py       # DXF frame/dims/title block (deterministic overlay)
 ├── dxf_lint.py           # advisory DXF readability lint (never a verdict)
+├── render.py             # advisory DXF→SVG→PNG raster + visual baseline
+├── advisory.py           # advisory envelope + typed visual-review records
 ├── report.py             # design-report.json/md
 ├── doctor.py             # environment probe
 ├── mcp_server.py         # stdio MCP boundary
-└── cli.py                # python -m mech {doctor,intake,author,gates,export,dxf-lint}
+└── cli.py                # python -m mech {doctor,intake,author,gates,export,dxf-lint,render}
 plugins/mech/             # OpenHands plugin
 ├── skills/               # mech-brief, mech-brief-rules, mech-enclosure,
 │                         # mech-mechanism,
@@ -53,9 +55,9 @@ docs/adr/  docs/research/
 ## Invariants
 
 - The design brief and intake files are the source of truth; generated
-  artifacts (STEP/STL/3MF/DXF, manifest, provenance, design report) are
-  projections and are never edited by hand — the `protect-generated` hook
-  blocks such writes.
+  artifacts (STEP/STL/3MF/DXF, SVG/PNG renders, manifest, provenance,
+  design report) are projections and are never edited by hand — the
+  `protect-generated` hook blocks such writes.
 - Pass/fail verdicts are produced only by the deterministic gates in
   `src/mech/gates.py` and the schemas they serialize.
 - LLM output, conversation text, review comments, and vision observations

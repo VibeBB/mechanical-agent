@@ -43,6 +43,17 @@ publish workflow also builds `mech-server` (OpenHands agent-server target
 - `ghcr.io/<owner>/mech-tools:<sha>-tools` (immutable) + `:latest`
 - `ghcr.io/<owner>/mech-server:<sha>-latest-source` + `:latest`
 
+The tools image installs `librsvg2-bin` (unpinned Ubuntu 26.04 apt) for
+`mech_render` / `python -m mech render`, which turns an exported `.dxf`
+into an `.svg` (ezdxf `SVGBackend`, in-process) plus a `.png`
+(`rsvg-convert`, override via `$MECH_RSVG_CONVERT`) so the vision lane can
+look at the drawing. `mech_render` also takes `baseline_path`: a missing
+baseline JSON records `{image, image_sha256}`, a readable one reports
+`match`/`diff`. Renders are advisory projections — the
+`protect-generated` hook covers `.svg`/`.png` writes, and review records
+follow the shared `review-visual-<slug>.advisory.json` contract
+(`src/mech/advisory.py`, ADR-0005).
+
 `docker/image-digests.json` is the digest lock. It is written only by
 `publish-mech-images.yml` (main pushes under `docker/`, `src/`,
 `plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, or manual
@@ -93,7 +104,7 @@ Update `CHANGELOG.md` in the release PR before dispatching.
 Follow [dependency-updates.md](dependency-updates.md). Weekly candidates
 land in the "Dependency update check report" issue as per-surface markdown
 tables (pypi, pypi-lock, uv-pin, python-version, github-actions, pypi-uvx,
-docker-arg, docker-base). To defer a candidate, record
+docker-arg, docker-base, apt). To defer a candidate, record
 `{surface, name, latest, review_by, reason}` in
 `scripts/dependency_update_deferrals.json` and revisit on the deadline or
 when a newer version appears. When adding/removing a dependency or a new

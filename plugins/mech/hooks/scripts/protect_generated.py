@@ -1,7 +1,7 @@
 """Reject writes to generated CAD artifacts and design reports.
 
-Generated files (.step/.stl/.3mf/.dxf, manifest.json, provenance.json,
-design-report.json) are projections of the brief. Editing them by hand breaks
+Generated files (.step/.stl/.3mf/.dxf/.svg/.png, manifest.json,
+provenance.json, design-report.json) are projections of the brief. Editing them by hand breaks
 the input-files-are-truth invariant; they must be regenerated from the brief.
 
 Only path-bearing arguments decide the verdict: file bodies such as
@@ -20,7 +20,16 @@ import shlex
 import sys
 from typing import Any, cast
 
-ARTIFACT_SUFFIXES = (".step", ".stp", ".stl", ".3mf", ".dxf", ".dxf_lint.json")
+ARTIFACT_SUFFIXES = (
+    ".step",
+    ".stp",
+    ".stl",
+    ".3mf",
+    ".dxf",
+    ".dxf_lint.json",
+    ".svg",
+    ".png",
+)
 ARTIFACT_NAMES = ("manifest.json", "provenance.json", "design-report.json")
 WRITE_TOOLS = {"file_editor", "apply_patch"}
 VIEW_ACTIONS = {"view", "read", "undo_edit"}
@@ -200,9 +209,10 @@ def main() -> int:
     payload = cast(dict[str, Any], payload)
     if _is_artifact_write(payload):
         print(
-            "generated artifacts (.step/.stl/.3mf/.dxf, design-report.json)"
-            " are projections of the brief; regenerate them via mech_author"
-            " or `python -m mech author`, never edit them directly",
+            "generated artifacts (.step/.stl/.3mf/.dxf/.svg/.png,"
+            " design-report.json) are projections of the brief; regenerate"
+            " them via mech_author / mech_render or `python -m mech"
+            " author|render`, never edit them directly",
             file=sys.stderr,
         )
         return 2

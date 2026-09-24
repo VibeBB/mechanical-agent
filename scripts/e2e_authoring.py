@@ -29,6 +29,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from mech.export import export_design
     from mech.gates import run_gates
     from mech.generators import generate
+    from mech.render import RenderError, render_dxf
     from mech.report import write_report
 
     out_dir = Path(args.out)
@@ -59,6 +60,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     report_path = write_report(brief, design, report, out_dir)
     payload = report.to_dict(brief)
     payload["report_path"] = str(report_path)
+
+    # Advisory vision lane: render each DXF projection to PNG. Missing or
+    # failing rasterizers degrade the lane — never the e2e verdict.
+    renders: list[str] = []
+    render_status = "ok"
+    for dxf_path in sorted(out_dir.glob("*.dxf")):
+        try:
+            renders.append(render_dxf(dxf_path).png_path)
+        except RenderError as exc:
+            render_status = f"skipped: {exc}"
+    payload["renders"] = renders
+    payload["render_status"] = render_status
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if report.verdict == "pass" else 2
 

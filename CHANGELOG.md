@@ -21,6 +21,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `mech_render` / `python -m mech render`: rasterizes an exported `.dxf`
+  to `.svg` (in-process `ezdxf` `SVGBackend`) and `.png`
+  (`rsvg-convert`, `$MECH_RSVG_CONVERT` override; `librsvg2-bin` added to
+  the tools image and the `apt` surface of the dependency checker). The
+  MCP result attaches the PNG as `ImageContent` so vision models see the
+  drawing inline, and `baseline_path` records/compares `image_sha256`
+  (`recorded`/`match`/`diff`) as a deterministic visual change detector
+  (ADR-0005).
+- `src/mech/advisory.py`: typed `VisualReviewDetail`/`VisualFinding`/
+  `AdvisoryResult` contract plus `parse_visual_review` for
+  `review-visual-<slug>.advisory.json` records; the `mech-review` agent
+  documents the convention (ADR-0005).
+- `protect-generated` now guards `.svg`/`.png` writes; renders are
+  projections of the brief like every other artifact.
+- `e2e_authoring.py` renders each exported DXF (fail-open) and reports
+  `renders`/`render_status` in the e2e payload.
 - `mech-brief` declares the `record-vision-tool-event` post hook in
   frontmatter (plugin hooks do not propagate to task sub-agents).
 - MCP tool metadata: every `mech_*` tool now carries `annotations.title`
