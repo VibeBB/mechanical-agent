@@ -33,6 +33,14 @@ All notable changes to this project are documented here. The format follows
   `AdvisoryResult` contract plus `parse_visual_review` for
   `review-visual-<slug>.advisory.json` records; the `mech-review` agent
   documents the convention (ADR-0005).
+- Drawing-quality review: `mech-review` now reviews `dxf_outline` sheets
+  on baseline fidelity (accurate, legible, unambiguous), manufacturing
+  completeness (self-sufficient for a no-context shop floor), and design
+  intent (datum-anchored dimensioning, view choice, line hierarchy).
+  `VisualReviewDetail` gains a required `impression` field — the
+  reviewer's subjective reading of the drawing — and four shared
+  categories: `ambiguous_notation`, `missing_dimension`,
+  `missing_manufacturing_info`, `design_intent`.
 - `protect-generated` now guards `.svg`/`.png` writes; renders are
   projections of the brief like every other artifact.
 - `e2e_authoring.py` renders each exported DXF (fail-open) and reports

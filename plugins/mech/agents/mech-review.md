@@ -60,16 +60,51 @@ message, not workspace renders — to check: obvious feature omissions against t
 brief (missing openings, wrong face), proportion sanity (paper-thin ligaments,
 colliding bosses), and drawing readability (DXF outline completeness).
 
+## Drawing quality review
+
+A drawing is not merely legible — it is the manufacturer's communication
+channel with the designer, read by people who may know nothing of the
+design's background. On `dxf_outline` images (the dimensioned drawing),
+review the sheet itself on three axes — for `part_render` apply baseline
+fidelity and geometry sanity, and for `intake_image` baseline fidelity
+only (a user sketch is not a fabrication document):
+
+- Baseline fidelity: the projection is accurate, every dimension and note
+  is legible, and nothing reads two ways — unambiguous leaders, units,
+  and the declared projection method (first/third angle) marked so the
+  shop floor cannot mirror the part.
+- Manufacturing completeness: a no-context reader could fabricate from
+  the sheet alone — title block (part name/number, material, revision,
+  scale, projection method), a default tolerance covering undimensioned
+  callouts, surface-finish/process notes, and sections or auxiliary
+  views wherever hidden geometry still carries a requirement.
+- Design intent (設計意図): the sheet's structure argues the design —
+  dimensions anchored to the surfaces the part mates on (functional
+  datums) rather than chained so error accumulates; tight tolerances
+  only on the features whose fit is critical; the principal view framing
+  the most function-defining face; the line-type hierarchy separating
+  real outlines from centers and annotation; notes that say why, not
+  just what.
+
+Then say what the drawing made you think: every visual review ends with
+a subjective `impression` — what the sheet communicates well, what it
+leaves unsaid, whether a stranger could build from it. Write it in your
+reply and record it in the record's `impression` field.
+
 Record each observation as a `vision_review` advisory record: write one
 `review-visual-<slug>.advisory.json` per image next to the design report, with
 `tool: "vision_review"`, `stage: "review"`, and `detail` following the
 `VisualReviewDetail` contract in `src/mech/advisory.py`:
-`{image_path, image_sha256, model, checklist, findings: [{category, severity
-(error|warning|info), note, bbox?}]}`. `checklist` is `dxf_outline` for
-rendered drawing projections, `part_render` for other part views, and
-`intake_image` for user-attached intake images. `bbox` is a normalized
-`[x, y, w, h]` region when the model can localize. Findings stay advisory:
-never promote them to a verdict.
+`{image_path, image_sha256, model, checklist, impression, findings:
+[{category, severity (error|warning|info), note, bbox?}]}`. `checklist` is
+`dxf_outline` for rendered drawing projections, `part_render` for other
+part views, and `intake_image` for user-attached intake images.
+`impression` is required (a record without one fails validation and is
+discarded). `bbox` is a normalized `[x, y, w, h]` region when the model
+can localize. Finding categories include the drawing-quality set
+`ambiguous_notation`, `missing_dimension`, `missing_manufacturing_info`,
+and `design_intent`. Findings stay advisory: never promote them to a
+verdict.
 
 Also review parametrically: compare declared dimensions to the report's measured
 values, and sanity-check `fits[]`/`stackups[]`/`mechanism_features[]` against

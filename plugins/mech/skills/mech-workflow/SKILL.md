@@ -55,3 +55,6 @@ sub-agents through the SDK task tools (`TaskToolSet` + `AgentDefinition` +
   (`inspect_image_with_vision` covers only user-attached images, not workspace
   files); every vision call is
   hashed into `observations/mech/vision-tool-events.jsonl` by the post_tool_use hook.
+  On `dxf_outline` drawings it reviews baseline fidelity, manufacturing
+  completeness, and design intent per `plugins/mech/agents/mech-review.md`,
+  and every `vision_review` record requires the `impression` field.

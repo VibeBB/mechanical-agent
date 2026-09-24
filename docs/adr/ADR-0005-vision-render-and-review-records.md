@@ -44,7 +44,13 @@ model to eyeball pixel drift.
 a malformed model answer can never masquerade as a record. Records are
 written as `review-visual-<slug>.advisory.json` next to
 `design-report.json` with mech-scoped checklists
-(`dxf_outline`/`part_render`/`intake_image`) and finding categories.
+(`dxf_outline`/`part_render`/`intake_image`), a required `impression`
+free-text field (the reviewer's subjective reading of the drawing — a
+record without one is discarded), and finding categories including the
+drawing-quality set `ambiguous_notation`, `missing_dimension`,
+`missing_manufacturing_info`, and `design_intent`; `mech-review`
+reviews `dxf_outline` sheets on baseline fidelity, manufacturing
+completeness, and design intent.
 
 Renders (`.svg`, `.png`) are projections of the brief like every other
 artifact, so `protect-generated` now guards those suffixes too.
