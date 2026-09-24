@@ -34,7 +34,7 @@ Hard rules:
   calls as L3 telemetry so image-derived intake claims stay auditable.
   Its companion `record-image-observation` hook logs direct image
   observations (`file_editor` views and `mech_render` outputs) to
-  `.openhands/mech/image-observations.jsonl`.
+  `observations/mech/image-observations.jsonl`.
 - Render-based measurement is prohibited: rendered pixels never replace a
   geometric measurement (all measurements come from the BRep kernel).
 
