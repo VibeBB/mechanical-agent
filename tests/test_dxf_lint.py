@@ -63,7 +63,57 @@ def test_unannotated_dxf_warns_about_missing_furniture():
     report = lint_text(_dxf(), source=Path("raw.dxf"))
     assert report.verdict == "pass"  # warnings never flip the verdict
     types = {f.type for f in report.findings}
-    assert {"missing_frame", "missing_title", "missing_dimensions"} <= types
+    assert {"missing_frame", "missing_title", "missing_dimensions", "missing_notes"} <= types
+
+
+def test_dxf_with_holes_but_no_table_warns():
+    doc = ezdxf.new()
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 10), (0, 10)], close=True, dxfattribs={"layer": "0"})
+    msp.add_circle((5, 5), 2.0, dxfattribs={"layer": "0"})
+    stream = io.StringIO()
+    doc.write(stream)
+    report = lint_text(stream.getvalue(), source=Path("holes.dxf"))
+    assert report.verdict == "pass"
+    types = {f.type for f in report.findings}
+    assert "hole_table_missing" in types
+    assert "missing_notes" in types
+
+
+def test_annotated_dxf_carries_notes_hole_table_and_fits(
+    enclosure_brief: DesignBrief, tmp_path: Path
+):
+    out_dir = tmp_path / "out"
+    design = generate(enclosure_brief)
+    export_design(enclosure_brief, design, out_dir)
+    dxf_path = out_dir / "demo-lid.dxf"
+    assert dxf_path.is_file()
+    doc = ezdxf.readfile(str(dxf_path))
+    msp = doc.modelspace()
+    texts: dict[str, list[str]] = {}
+    for e in msp:
+        if e.dxftype() == "TEXT":
+            texts.setdefault(e.dxf.layer, []).append(e.dxf.text)
+    title = " ".join(texts.get("TITLE", []))
+    assert "MATERIAL ABS" in title
+    assert "PROCESS  fdm" in title
+    notes = " ".join(texts.get("NOTES", []))
+    assert "HOLE TABLE" in notes
+    assert "GEN TOL" in notes
+    assert "LOWER-LEFT" in notes
+    assert "FIT FT1" in notes and "H7/g6" in notes
+    # Every hole in the outline has a table row and an on-drawing tag.
+    from mech.dxf_annotate import hole_circles
+
+    holes = hole_circles(msp)
+    tag_rows = [t for t in texts.get("NOTES", []) if t.startswith("A")]
+    assert len(holes) == len(tag_rows) > 0
+    dims = texts.get("DIMS", [])
+    for i in range(len(holes)):
+        assert f"A{i + 1}" in dims
+    # The drawing still lints clean.
+    report = lint_text(dxf_path.read_text(encoding="utf-8", errors="replace"), source=dxf_path)
+    assert report.verdict == "pass", report.findings
 
 
 def test_design_report_embeds_lint_advisory(enclosure_brief: DesignBrief, tmp_path: Path):
