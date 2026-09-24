@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -69,3 +70,46 @@ def test_corrupted_brief_fails_sha(
     report = _check(mutated, data, tmp_path)
     assert report.verdict == "blocked"
     assert not report.sha_matches
+
+
+def _evidence_intake(brief: DesignBrief, tmp_path: Path) -> tuple[Intake, Path]:
+    payload = b"pretend photo"
+    image = tmp_path / "attachments" / "abcd1234abcd.png"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(payload)
+    data = _intake_dict(brief)
+    data["assumptions"][0]["evidence"] = {
+        "kind": "image",
+        "path": str(image.relative_to(tmp_path)),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "note": "connector photo from the user",
+    }
+    intake = Intake.model_validate(data)
+    return intake, tmp_path / "b.intake.json"
+
+
+def test_evidence_ref_valid_passes(enclosure_brief: DesignBrief, tmp_path: Path):
+    intake, intake_path = _evidence_intake(enclosure_brief, tmp_path)
+    report = check_intake(enclosure_brief, intake, tmp_path / "b.json", intake_path)
+    assert report.verdict == "ready"
+    assert report.evidence_errors == []
+
+
+def test_evidence_missing_file_blocks(enclosure_brief: DesignBrief, tmp_path: Path):
+    intake, intake_path = _evidence_intake(enclosure_brief, tmp_path)
+    (tmp_path / "attachments" / "abcd1234abcd.png").unlink()
+    report = check_intake(enclosure_brief, intake, tmp_path / "b.json", intake_path)
+    assert report.verdict == "blocked"
+    assert report.evidence_errors == [
+        f"{intake.assumptions[0].id} evidence attachments/abcd1234abcd.png: file missing"
+    ]
+
+
+def test_evidence_sha_mismatch_blocks(enclosure_brief: DesignBrief, tmp_path: Path):
+    intake, intake_path = _evidence_intake(enclosure_brief, tmp_path)
+    (tmp_path / "attachments" / "abcd1234abcd.png").write_bytes(b"tampered")
+    report = check_intake(enclosure_brief, intake, tmp_path / "b.json", intake_path)
+    assert report.verdict == "blocked"
+    assert report.evidence_errors == [
+        f"{intake.assumptions[0].id} evidence attachments/abcd1234abcd.png: sha256 mismatch"
+    ]

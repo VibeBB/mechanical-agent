@@ -35,8 +35,9 @@ plugins/mech/             # OpenHands plugin
 │                         # mech-dfm, mech-gates, mech-workflow
 ├── agents/               # mech-brief, mech-design, mech-review (task sub-agents)
 ├── commands/             # /mech:design, /mech:doctor, /mech:gates, /mech:export
-├── hooks/                # session_start doctor, pre_tool_use artifact guard,
-│                         # stop status, post_tool_use vision event record
+├── hooks/                # session_start doctor + intake-attachments,
+│                         # user_prompt_submit attachments, pre_tool_use artifact
+│                         # guard, stop status + attachments, post_tool_use vision
 ├── scripts/mech_launcher.py
 ├── .mcp.json
 └── .plugin/plugin.json

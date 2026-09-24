@@ -1,0 +1,74 @@
+{
+  "brief_sha256": "8ff594b69d694e2097e20716e382f48d9a96c2614a7d0b2c2b54fbdb005f6cf8",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "80x60x30 mm ABS enclosure for the board",
+      "source": "user",
+      "speaker": "user"
+    },
+    {
+      "id": "R2",
+      "text": "Front-panel connector opening",
+      "source": "user",
+      "speaker": "user"
+    },
+    {
+      "id": "R3",
+      "text": "Mounting holes at the four board corners",
+      "source": "user",
+      "speaker": "user"
+    },
+    {
+      "id": "R4",
+      "text": "Screw-on lid",
+      "source": "user",
+      "speaker": "user"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "text": "Board fits inside the stated interior volume",
+      "rationale": "no board STEP was provided; envelope assumed from the stated footprint"
+    },
+    {
+      "id": "A2",
+      "text": "Vent slots on the left wall are decorative/cooling",
+      "rationale": "user sketched slots but gave no airflow requirement"
+    }
+  ],
+  "open_questions": [],
+  "part_sources": {
+    "shell": [
+      "R1"
+    ],
+    "lid": [
+      "R1",
+      "R4"
+    ]
+  },
+  "feature_sources": {
+    "O1": [
+      "R2"
+    ],
+    "MH1": [
+      "R3"
+    ],
+    "MH2": [
+      "R3"
+    ],
+    "MH3": [
+      "R3"
+    ],
+    "MH4": [
+      "R3"
+    ],
+    "FT1": [
+      "R4"
+    ],
+    "SC1": [
+      "A2"
+    ]
+  }
+}
