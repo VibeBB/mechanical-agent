@@ -107,7 +107,8 @@ Launcher commands (`.mcp.json`, hooks) resolve the plugin root in order:
 `$HOME/.agents/plugins/mech`, `$HOME/.openhands/plugins/installed/mech`.
 `mech_launcher.py` then execs `python -m mech.*` inside the pinned
 `mech-tools` image (resolved via `$MECH_TOOLS_IMAGE` ->
-`docker/image-digests.json` -> a local build of the cached Dockerfile),
+`docker/image-digests.json`; an unresolvable or unpullable ref is an
+error — the launcher never falls back to a local build),
 mounting the matching `src/` read-only at `/plugin-src` and the workspace
 at its own path — host Python only launches docker. Any argument other
 than `mcp_server`/`prewarm` is forwarded to `mech.cli`, so CLI docs write

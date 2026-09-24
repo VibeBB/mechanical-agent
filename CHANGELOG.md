@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Docker-only runtime: `mech_launcher.py` no longer falls back to a local
+  `docker build` when no pinned image resolves — `$MECH_TOOLS_IMAGE` or a
+  digest lock (`tools-image.json` / `docker/image-digests.json`) is now
+  required, and a failed pull is an error.
+
 ### Fixed
 
 - `scripts/check_plugin_load.py` now asserts `post_tool_use` hooks (previously
