@@ -1,10 +1,10 @@
 {
   "mech_server": {
-    "digest": "sha256:dc05d5d61cc54d26473732f7e2df0afb88baeaf26902844283b6b2a28997c556",
+    "digest": "sha256:abb467baa0ca7ef973427ad9024d9217ab47dd6173c8d26de329d422eb60dfaf",
     "dockerfile": "sdk:openhands-agent-server/v1.49.5",
     "image": "ghcr.io/vibebb/mech-server",
-    "published_at": "2026-09-24T13:04:20Z",
-    "tag": "9e07cd1b499230577be90d17414aeb7ed2c89385-latest-source",
+    "published_at": "2026-09-24T14:45:28Z",
+    "tag": "3d53ed125fcbbdca68ed24ebe8312b09fdbcabaf-latest-source",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.53.0",
@@ -12,14 +12,14 @@
       "python": "Python 3.12.14",
       "uv": "0.12.18 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/36000468122"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/36013690036"
   },
   "mech_tools": {
-    "digest": "sha256:5283798834e60be17d074ca751412359ae64b9847e3371f3a7c5b42605046a9c",
+    "digest": "sha256:1a50f9e090279e6409279b72a2448243411ce1abb87408ec687732a6fd5b58ba",
     "dockerfile": "docker/mech-tools.Dockerfile",
     "image": "ghcr.io/vibebb/mech-tools",
-    "published_at": "2026-09-24T13:04:20Z",
-    "tag": "9e07cd1b499230577be90d17414aeb7ed2c89385-tools",
+    "published_at": "2026-09-24T14:45:28Z",
+    "tag": "3d53ed125fcbbdca68ed24ebe8312b09fdbcabaf-tools",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.53.0",
@@ -27,6 +27,6 @@
       "python": "Python 3.12.14",
       "uv": "0.12.18 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/36000468122"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/36013690036"
   }
 }
