@@ -1,0 +1,5 @@
+- Pass/fail verdicts come only from the deterministic gates in `src/mech/gates.py`; LLM, vision, and review output is L2 advisory and never promoted to a verdict.
+- Generated artifacts (STEP/STL/3MF/DXF, manifest, provenance, design-report) are projections of the brief — regenerate them, never edit by hand.
+- Fail-closed: an unexecuted or unmeasurable gate reports `unknown` and fails the design.
+- Secrets flow via `${VAR}` expansion in `mcp_config` and process env; never log or commit them.
+- Sub-agents resolve `model: vibebb-author`/`vibebb-review` from `~/.openhands/profiles/`; create those profiles before invoking `task` agents.

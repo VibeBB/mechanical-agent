@@ -28,7 +28,7 @@ EXPECTED_SKILLS = {
 EXPECTED_COMMANDS = {"design", "doctor", "gates", "export"}
 EXPECTED_SESSION_START_HOOKS = {"mech-doctor", "intake-attachments"}
 EXPECTED_USER_PROMPT_SUBMIT_HOOKS = {"intake-attachments"}
-EXPECTED_PRE_TOOL_USE_HOOKS = {"protect-generated"}
+EXPECTED_PRE_TOOL_USE_HOOKS = {"protect-generated", "safety-rail"}
 EXPECTED_STOP_HOOKS = {"report-design-status", "intake-attachments"}
 EXPECTED_POST_TOOL_USE_HOOKS = {"record-image-observation", "record-vision-tool-event"}
 
