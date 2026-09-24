@@ -25,6 +25,7 @@ src/mech/                 # deterministic mechanical-design core
 ├── generators/           # parametric part generators (lazy build123d)
 ├── gates.py              # authoritative gate runner
 ├── export.py             # STEP/STL/3MF/DXF + manifest/provenance
+├── dxf_annotate.py       # DXF frame/dims/title block (deterministic overlay)
 ├── report.py             # design-report.json/md
 ├── doctor.py             # environment probe
 ├── mcp_server.py         # stdio MCP boundary
