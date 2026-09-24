@@ -18,6 +18,13 @@ All notable changes to this project are documented here. The format follows
 - `scripts/check_plugin_load.py` now asserts `post_tool_use` hooks (previously
   collected but unchecked) and renders the OK summary from the actual expected
   asset sets instead of a stale hardcoded string.
+- Wide, shallow parts no longer push the documentation column out of the
+  drawing: the frame grows upward until the title + notes stacks fit, and
+  body text is capped at 7 mm (top of the ISO 3098 drawing series) so
+  large parts do not balloon the sheet. Hole-diameter labels now dodge
+  the title/notes blocks, hole tags (with padding — touching text reads
+  as one word on paper), and each other instead of only checking the
+  title block's insert point.
 
 ### Added
 
@@ -57,6 +64,14 @@ All notable changes to this project are documented here. The format follows
   notes) and `hole_table_missing` (circular features present but no hole
   table) — same hole detection as the annotator (`hole_circles` is now
   public for sharing).
+- The documentation column now covers the contract features a top outline
+  cannot show: an OPENINGS TABLE (`OPEN | FACE | SIZE | CX | CY`,
+  face-centre coordinates) carrying each part's wall/top openings, a
+  BOARD MOUNT TABLE on the shell (`HOLE | PILOT | X | Y` — the drilled
+  standoff pilot, not the board clearance diameter), a VENT note with
+  slot count/size/pitch, a `FINISH Ra 3.2` note for machining, and a
+  `REV A` title-block row. `standoff_diameters` / `vent_slot_count`
+  moved into `brief.py` as shared contract math.
 - `e2e_authoring.py` renders each exported DXF (fail-open) and reports
   `renders`/`render_status` in the e2e payload.
 - `mech-brief` declares the `record-vision-tool-event` post hook in
