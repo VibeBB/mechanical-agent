@@ -160,7 +160,7 @@ def test_mcp_bad_arguments_fail_closed():
 def test_mcp_tool_annotations():
     from mech.mcp_server import tool_specs
 
-    write_tools = {"mech_author", "mech_gates", "mech_export_envelope"}
+    write_tools = {"mech_author", "mech_gates", "mech_export_envelope", "mech_render"}
     tools = tool_specs()
     assert {tool.name for tool in tools} == {
         "mech_doctor",
@@ -172,6 +172,7 @@ def test_mcp_tool_annotations():
         "mech_gates",
         "mech_export_envelope",
         "mech_dxf_lint",
+        "mech_render",
     }
     for tool in tools:
         annotations = tool.annotations

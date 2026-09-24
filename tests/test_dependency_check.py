@@ -59,6 +59,15 @@ def test_docker_base_image_parsed():
     assert base == ("ubuntu", "26.04")
 
 
+def test_tracked_apt_packages_present_in_dockerfile():
+    from scripts.check_dependency_updates import APT_PACKAGES
+
+    dockerfile_text = (ROOT / "docker" / "mech-tools.Dockerfile").read_text(encoding="utf-8")
+    assert "librsvg2-bin" in APT_PACKAGES
+    for package in APT_PACKAGES:
+        assert package in dockerfile_text
+
+
 def test_render_markdown_groups_by_surface():
     statuses = [
         DependencyStatus("pypi", "pydantic", "2.13.5", "2.13.5", "pyproject.toml", False),

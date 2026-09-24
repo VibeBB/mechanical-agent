@@ -75,8 +75,8 @@ pass/fail authority).
 
 The `mech` MCP server exposes deterministic tools (`mech_doctor`,
 `mech_validate_brief`, `mech_intake`, `mech_fit_lookup`, `mech_standards`,
-`mech_author`, `mech_gates`) over stdio; `.mcp.json` resolves it through
-`scripts/mech_launcher.py`.
+`mech_author`, `mech_gates`, `mech_dxf_lint`, `mech_render`) over stdio;
+`.mcp.json` resolves it through `scripts/mech_launcher.py`.
 
 ### Using the core directly
 
@@ -87,6 +87,7 @@ uv run python -m mech intake --brief design.brief.json --intake intake.json
 uv run python -m mech author --brief design.brief.json --out out/design
 uv run python -m mech gates  --brief design.brief.json --out out/design
 uv run python -m mech export --brief design.brief.json --out out/design
+uv run python -m mech render --dxf out/design/part.dxf   # advisory PNG render
 # or the one-shot driver:
 uv run python scripts/e2e_authoring.py --brief design.brief.json --out out/design
 ```
@@ -96,6 +97,11 @@ part), `*.3mf`, `*.dxf` outlines, `manifest.json` (sha256 of every file),
 `provenance.json` (license + brief hash + tool versions), and `design-report.json` /
 `design-report.md` (per-check verdicts). If any gate is `fail` or
 `unknown`, the design verdict is `fail`.
+
+`render` turns a `.dxf` outline into `.svg` + `.png` (`rsvg-convert`,
+advisory only) so the vision lane can review the drawing; the MCP result
+attaches the PNG inline and `baseline_path` records/compares the
+`image_sha256` (ADR-0005).
 
 ### Gate coverage
 

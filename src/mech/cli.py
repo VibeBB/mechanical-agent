@@ -6,6 +6,7 @@ Subcommands:
   author          generate parts, export artifacts, run all gates, write the report
   export          generate parts and export artifacts without gates
   gates           regenerate the design and re-run all gates on existing artifacts
+  render          rasterize an exported DXF to PNG for the advisory vision lane
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
 
 All commands print a JSON verdict to stdout; the verdict is fail-closed.
@@ -113,6 +114,28 @@ def _cmd_dxf_lint(args: argparse.Namespace) -> dict[str, Any]:
     return report.model_dump(mode="json")
 
 
+def _cmd_render(args: argparse.Namespace) -> dict[str, Any]:
+    from .render import render_dxf
+
+    result = render_dxf(
+        Path(args.dxf),
+        Path(args.out) if args.out else None,
+        dpi=args.dpi,
+        baseline_path=Path(args.baseline) if args.baseline else None,
+    )
+    payload: dict[str, Any] = {
+        "verdict": "pass",
+        "dxf_path": result.dxf_path,
+        "svg_path": result.svg_path,
+        "png_path": result.png_path,
+        "image_sha256": result.image_sha256,
+    }
+    if result.baseline is not None:
+        payload["baseline"] = result.baseline
+        payload["baseline_sha256"] = result.baseline_sha256
+    return payload
+
+
 def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = Path(args.out)
     try:
@@ -163,6 +186,19 @@ def build_parser() -> argparse.ArgumentParser:
     lint_p.add_argument("--in", dest="drawing", required=True, help="DXF drawing to lint")
     lint_p.add_argument("--out", default=None, help="optional report output path")
 
+    render_p = sub.add_parser(
+        "render",
+        help="rasterize an exported DXF to PNG for the advisory vision lane",
+    )
+    render_p.add_argument("--dxf", required=True, help="DXF drawing to render")
+    render_p.add_argument("--out", default=None, help="output PNG path (default: <dxf>.png)")
+    render_p.add_argument("--dpi", type=int, default=200, help="raster resolution")
+    render_p.add_argument(
+        "--baseline",
+        default=None,
+        help="optional baseline JSON: recorded when missing, compared when present",
+    )
+
     envelope_p = sub.add_parser(
         "export-envelope",
         help="emit the wire-agent envelope contract",
@@ -186,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         "export": _cmd_export,
         "gates": _cmd_gates,
         "dxf-lint": _cmd_dxf_lint,
+        "render": _cmd_render,
     }
     handler = handlers[args.command]
     try:

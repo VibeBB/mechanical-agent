@@ -41,6 +41,7 @@ DEPENDENCY_SURFACES = (
     "pypi-uvx",
     "docker-arg",
     "docker-base",
+    "apt",
 )
 
 FetchJson = Callable[[str], Any]
@@ -344,6 +345,7 @@ def check_github_actions(
 _DOCKER_ARG = re.compile(r"^ARG\s+([A-Z_]+)=([^\s#]+)", re.MULTILINE)
 _DOCKER_FROM = re.compile(r"^FROM\s+([^\s:@]+)(?::([^\s@]+))?", re.MULTILINE)
 _DOCKERFILES = ["mech-tools.Dockerfile"]
+APT_PACKAGES = ("librsvg2-bin",)
 
 
 def docker_arg_pins(repo_root: Path) -> dict[str, str]:
@@ -617,6 +619,37 @@ def check_dependency_updates(
 
     pypi = check_pypi(repo_root, fetch_json=fetch_json)
     direct_names = {status.name for status in pypi}
+    dockerfile_text = "\n".join(
+        (repo_root / "docker" / name).read_text(encoding="utf-8")
+        for name in _DOCKERFILES
+        if (repo_root / "docker" / name).is_file()
+    )
+    missing_apt = [pkg for pkg in APT_PACKAGES if pkg not in dockerfile_text]
+    apt_statuses = [
+        DependencyStatus(
+            "apt",
+            package,
+            "unpinned",
+            "(Ubuntu 26.04 archive)",
+            "apt",
+            False,
+            "rasterizer dep; version tracking deferred to the Ubuntu archive",
+        )
+        for package in APT_PACKAGES
+        if package not in missing_apt
+    ]
+    apt_statuses.extend(
+        DependencyStatus(
+            "apt",
+            package,
+            "-",
+            "?",
+            "apt",
+            False,
+            f"tracked apt package missing from {_DOCKERFILES}",
+        )
+        for package in missing_apt
+    )
     return [
         *pypi,
         *check_pypi_lock(repo_root, direct_names, run_uv=run_uv),
@@ -625,6 +658,7 @@ def check_dependency_updates(
         *check_docker_args(repo_root, list_remote_tags=cached_tags),
         *check_docker_base(repo_root, fetch_json=fetch_json),
         *check_python_versions(repo_root, list_remote_tags=cached_tags),
+        *apt_statuses,
     ]
 
 
@@ -638,6 +672,7 @@ def render_markdown(statuses: list[DependencyStatus]) -> str:
         "pypi-uvx": "PyPI (uvx tool pins in workflows)",
         "docker-arg": "Docker ARG",
         "docker-base": "Docker base image",
+        "apt": "apt packages",
     }
     lines = ["# Dependency update check report", ""]
     for surface, label in labels.items():

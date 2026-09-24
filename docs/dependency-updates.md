@@ -61,6 +61,7 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | ubuntu base image | `26.04` | `docker/mech-tools.Dockerfile` `FROM` |
 | uv | `0.12.18` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
 | Python in image | `3.12` | `uv python install` inside the Dockerfile |
+| librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
 
 ## Checked by `scripts/check_dependency_updates.py`
 
@@ -84,6 +85,11 @@ state columns `update available` / `deferred` / `up to date`. Surfaces:
   required-version` by a unit test.
 - `docker-base` — `FROM ubuntu:YY.MM` against the newest Ubuntu `YY.04`
   LTS tag on Docker Hub.
+- `apt` — unpinned apt packages the Dockerfile installs for external tools
+  (`APT_PACKAGES` in the checker; currently `librsvg2-bin` for the
+  `mech_render` rasterizer). Apt versions track the Ubuntu archive, so the
+  surface reports presence, not upgrades: a package absent from the
+  Dockerfile is flagged instead.
 
 The weekly workflow posts the markdown report to the "Dependency update
 check report" issue. Deferred candidates are recorded in

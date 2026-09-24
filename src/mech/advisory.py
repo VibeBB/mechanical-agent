@@ -1,0 +1,76 @@
+"""Advisory visual-review records kept separate from the deterministic gates."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+VISION_REVIEW_TOOL = "vision_review"
+
+VisualChecklist = Literal[
+    "dxf_outline",
+    "part_render",
+    "intake_image",
+]
+
+VisualFindingCategory = Literal[
+    "missing_feature",
+    "wrong_face",
+    "proportion_anomaly",
+    "thin_ligament",
+    "colliding_feature",
+    "outline_completeness",
+    "dimension_legibility",
+    "text_outside_frame",
+    "text_collision",
+    "datasheet_mismatch",
+    "other",
+]
+
+
+class VisualFinding(BaseModel):
+    """One advisory observation from a visual review of an image."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: VisualFindingCategory
+    severity: Literal["error", "warning", "info"]
+    note: str = Field(min_length=1)
+    bbox: list[float] | None = Field(
+        default=None,
+        description="Optional normalized [x, y, w, h] region in the image",
+    )
+
+
+class VisualReviewDetail(BaseModel):
+    """`detail` payload of a `vision_review` AdvisoryResult record."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image_path: str
+    image_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    model: str = Field(min_length=1)
+    checklist: VisualChecklist
+    findings: list[VisualFinding] = Field(default_factory=lambda: list[VisualFinding]())
+
+
+def parse_visual_review(result: AdvisoryResult) -> VisualReviewDetail | None:
+    """Return the typed detail when `result` is a vision_review record."""
+    if result.tool != VISION_REVIEW_TOOL or result.detail is None:
+        return None
+    try:
+        return VisualReviewDetail.model_validate(result.detail)
+    except ValidationError:
+        return None
+
+
+class AdvisoryResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool: str
+    stage: Literal["intake", "brief", "author", "gates", "review", "export"]
+    status: Literal["ok", "error", "not_applicable"]
+    summary: str
+    artifacts: list[str] = Field(default_factory=list)
+    detail: dict[str, object] | None = None
