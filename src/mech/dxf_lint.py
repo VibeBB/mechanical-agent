@@ -22,6 +22,8 @@ from typing import Any, Literal
 import ezdxf
 from pydantic import BaseModel, ConfigDict, Field
 
+from . import dxf_annotate
+
 
 class DxfLintError(ValueError):
     """Raised when a DXF file cannot be linted."""
@@ -132,6 +134,31 @@ def _lint_doc(doc: Any, source: Path) -> DxfLintReport:
         )
 
     texts = [e for e in entities if e.dxftype() == "TEXT"]
+    text_values = [e.dxf.text for e in texts]
+    if not _entities(msp, "NOTES", "TEXT"):
+        findings.append(
+            DxfLintFinding(
+                type="missing_notes",
+                severity="warning",
+                description=(
+                    "no NOTES-layer text; drawing lacks general notes "
+                    "(units, tolerances, process context)"
+                ),
+            )
+        )
+    hole_count = len(dxf_annotate.hole_circles(msp))
+    if hole_count and not any(v.startswith("HOLE TABLE") for v in text_values):
+        findings.append(
+            DxfLintFinding(
+                type="hole_table_missing",
+                severity="warning",
+                description=(
+                    f"{hole_count} circular feature(s) but no hole table; "
+                    "hole positions cannot be located without it"
+                ),
+            )
+        )
+
     if frame is not None:
         (fx0, fy0), (fx1, fy1) = frame
         for entity in texts:

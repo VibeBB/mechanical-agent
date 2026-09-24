@@ -145,7 +145,14 @@ def export_design(
             exporter = b.ExportDXF()
             exporter.add_shape(outline)
             exporter.write(str(dxf_path))
-            dxf_annotate.annotate_dxf(dxf_path, design=name, part_id=part.part_id)
+            dxf_annotate.annotate_dxf(
+                dxf_path,
+                design=name,
+                part_id=part.part_id,
+                material=brief.material,
+                process=brief.process,
+                fits=brief.fits,
+            )
             record(dxf_path, "dxf", part.part_id)
             lint_report = dxf_lint.lint_text(
                 dxf_path.read_text(encoding="utf-8", errors="replace"),

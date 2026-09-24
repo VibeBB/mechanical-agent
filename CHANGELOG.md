@@ -43,6 +43,20 @@ All notable changes to this project are documented here. The format follows
   `missing_manufacturing_info`, `design_intent`.
 - `protect-generated` now guards `.svg`/`.png` writes; renders are
   projections of the brief like every other artifact.
+- Exported part DXFs are now self-documenting (manufacturing completeness +
+  design intent on the drawing itself): the frame widens into a right-hand
+  documentation column holding a HOLE TABLE (`HOLE | DIA | X | Y` per hole,
+  X/Y measured from the lower-left part edge as the datum) and a numbered
+  NOTES block — units, a process-mapped general-tolerance note
+  (ISO 2768-m/-c for machining/sheet metal, mm bands for FDM/molding),
+  the hole-table datum note, a deburr note for cut processes, and one line
+  per declared fit (`FIT <id> <feature> ⌀<nominal> <hole>/<shaft> <intent>`).
+  Holes also get crosshair center marks and `A<n>` tags on the drawing,
+  matching the table. The title block gains MATERIAL/PROCESS rows.
+- `dxf_lint` gains two warnings: `missing_notes` (no NOTES-layer general
+  notes) and `hole_table_missing` (circular features present but no hole
+  table) — same hole detection as the annotator (`hole_circles` is now
+  public for sharing).
 - `e2e_authoring.py` renders each exported DXF (fail-open) and reports
   `renders`/`render_status` in the e2e payload.
 - `mech-brief` declares the `record-vision-tool-event` post hook in
