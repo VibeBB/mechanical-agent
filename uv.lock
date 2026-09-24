@@ -2452,6 +2452,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "build123d" },
+    { name = "ezdxf" },
     { name = "mcp" },
     { name = "openhands-sdk" },
     { name = "openhands-tools" },
@@ -2470,6 +2471,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "build123d", specifier = "==0.13.0" },
+    { name = "ezdxf", specifier = "==1.4.4" },
     { name = "mcp", specifier = ">=1.29,<2" },
     { name = "openhands-sdk", specifier = "==1.49.5" },
     { name = "openhands-tools", specifier = "==1.49.5" },

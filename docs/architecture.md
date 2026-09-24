@@ -23,6 +23,8 @@ user conversation
          ▼  L1 only below this line
       generate(brief)   ── build123d parametric parts + reference solids
       export(brief)     ── STEP/STL/3MF/DXF + manifest.json + provenance.json
+                          (DXF outlines are annotated: frame, extents dims,
+                          hole diameters, title block)
       run_gates(brief)  ── GateCheck[] -> GateReport (verdict pass|fail)
       write_report()    ── design-report.json + design-report.md
 ```
@@ -39,7 +41,10 @@ output directory (verify-only, no regeneration).
   container-volatile by construction: lib3mf writes a fresh `p:UUID` per
   object (normalized in the model XML, but the zip64 container headers are
   not reproducible), and OCCT serializes DXF entity order and symmetric-
-  hole sign conventions non-deterministically. Determinism for those two
+  hole sign conventions non-deterministically — the annotation pass adds
+  entities derived from that outline, so its content varies the same way
+  while ezdxf's own volatile fields (datetimes, version banner, GUIDs) are
+  pinned. Determinism for those two
   is therefore asserted at content level (3MF zip entries, DXF entity
   tokens) in `test_export_deterministic`, not byte level. Every file is
   sha256-recorded in `manifest.json` and verified by the manifest gate.

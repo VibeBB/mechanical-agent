@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -120,3 +121,41 @@ def test_doctor_fail_closed_shape():
     assert "checks" in report
     for check in report["checks"]:
         assert check["status"] in {"pass", "fail"}
+
+
+def test_dxf_annotated_layers_and_title(enclosure_brief: DesignBrief, tmp_path: Path):
+    # ezdxf.readfile is only partially typed upstream.
+    from ezdxf.filemanagement import readfile  # pyright: ignore[reportUnknownVariableType]
+
+    out_dir = tmp_path / "out"
+    design = generate(enclosure_brief)
+    export_design(enclosure_brief, design, out_dir)
+    dxf_path = out_dir / "demo-shell.dxf"
+    doc = readfile(str(dxf_path))
+    msp = doc.modelspace()
+    layers = {e.dxf.layer for e in msp}
+    assert {"0", "FRAME", "DIMS", "TITLE"} <= layers
+    texts = [e.dxf.text for e in msp if e.dxftype() == "TEXT"]
+    assert any(t.startswith("DESIGN") for t in texts)
+    assert any(t.startswith("PART") and "shell" in t for t in texts)
+    # overall extents dims: "80" and "60" for the 80x60 enclosure
+    assert "80" in texts and "60" in texts
+
+    # the lid's mounting holes are plain circles -> diameter callouts
+    lid = readfile(str(out_dir / "demo-lid.dxf"))
+    lid_texts = [e.dxf.text for e in lid.modelspace() if e.dxftype() == "TEXT"]
+    assert any(t.startswith("%%c") for t in lid_texts)
+
+
+def test_dxf_volatile_fields_pinned(enclosure_brief: DesignBrief, tmp_path: Path):
+    """ezdxf's wall-clock stamps and placeholder GUIDs must be normalized so the
+    only remaining DXF variance is OCCT entity ordering (covered by the
+    token-multiset comparison above)."""
+    out_dir = tmp_path / "out"
+    design = generate(enclosure_brief)
+    export_design(enclosure_brief, design, out_dir)
+    text = (out_dir / "demo-shell.dxf").read_text(encoding="utf-8")
+    assert "1.4.4 @ 0" in text
+    assert not re.search(r"1\.4\.4 @ 2", text)
+    cleaned = text.replace("{00000000-0000-0000-0000-000000000000}", "")
+    assert not re.search(r"\{[0-9A-Fa-f-]{36}\}", cleaned)

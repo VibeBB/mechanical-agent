@@ -9,6 +9,7 @@ the adoption decision for each. Update it in the same change that touches
 | Package | Pin | Source | Decision |
 | --- | --- | --- | --- |
 | build123d | `==0.13.0` | PyPI | Exact pin — CAD kernel behavior is release-sensitive (mesh/boolean edge cases verified against this version). Bundles OCP (OCCT 7.9) and ezdxf. Requires the `pillow>=12.3.0,<13` `override-dependencies` entry (see "Overrides"). |
+| ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
 | openhands-sdk | `==1.49.5` | PyPI | Exact pin — plugin API contract. |

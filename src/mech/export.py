@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from . import dxf_annotate
 from .brief import DesignBrief, brief_sha256
 from .generators.common import GeneratedDesign, build123d
 
@@ -144,6 +145,7 @@ def export_design(
             exporter = b.ExportDXF()
             exporter.add_shape(outline)
             exporter.write(str(dxf_path))
+            dxf_annotate.annotate_dxf(dxf_path, design=name, part_id=part.part_id)
             record(dxf_path, "dxf", part.part_id)
 
     mesher = b.Mesher()
