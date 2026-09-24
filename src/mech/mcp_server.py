@@ -104,6 +104,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["brief", "out_path"],
         "additionalProperties": False,
     },
+    "mech_dxf_lint": {
+        "type": "object",
+        "properties": {
+            "drawing_path": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+        "required": ["drawing_path"],
+        "additionalProperties": False,
+    },
 }
 
 _DESCRIPTIONS = {
@@ -117,6 +126,7 @@ _DESCRIPTIONS = {
     "mech_export_envelope": (
         "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
     ),
+    "mech_dxf_lint": "Advisory readability lint for a DXF drawing (never a gate verdict).",
 }
 
 
@@ -252,6 +262,14 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             )
         if name in ("mech_author", "mech_gates"):
             return _run_pipeline(name, arguments)
+        if name == "mech_dxf_lint":
+            from .dxf_lint import lint_file
+
+            report = lint_file(
+                Path(arguments["drawing_path"]),
+                Path(arguments["output_path"]) if arguments.get("output_path") else None,
+            )
+            return _ok(report.model_dump(mode="json"))
         return _error(f"unknown mech tool: {name}")
     except Exception as exc:  # fail-closed transport boundary
         return _error(str(exc))
@@ -276,6 +294,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_author": _anno("Author design", write=True),
     "mech_gates": _anno("Re-run gates", write=True),
     "mech_export_envelope": _anno("Export envelope contract", write=True),
+    "mech_dxf_lint": _anno("DXF lint", write=False),
 }
 
 

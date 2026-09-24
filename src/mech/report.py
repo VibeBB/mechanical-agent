@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,12 @@ def write_report(
     out_dir: Path,
 ) -> Path:
     report = build_report(brief, design, gate_report)
+    lints: dict[str, Any] = {}
+    for lint_path in sorted(out_dir.glob("*.dxf_lint.json")):
+        with contextlib.suppress(json.JSONDecodeError):
+            lints[lint_path.name] = json.loads(lint_path.read_text(encoding="utf-8"))
+    if lints:
+        report["advisories"] = {"dxf_lint": lints}
     path = out_dir / "design-report.json"
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md = out_dir / "design-report.md"
@@ -82,5 +89,21 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {check['id']} | {check['subject']} | {check['status']} "
             f"| {measured} | {limit} | {check['detail']} |"
         )
+    lints = report.get("advisories", {}).get("dxf_lint", {})
+    if lints:
+        lines += [
+            "",
+            "## DXF lint (advisory)",
+            "",
+        ]
+        for name, lint in lints.items():
+            lines.append(
+                f"- {name}: {lint['verdict']} "
+                f"({lint['errors']} errors, {lint['warnings']} warnings)"
+            )
+            for finding in lint["findings"]:
+                lines.append(
+                    f"  - {finding['severity']}: {finding['type']} — {finding['description']}"
+                )
     lines.append("")
     return "\n".join(lines)
