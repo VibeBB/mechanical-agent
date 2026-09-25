@@ -59,7 +59,21 @@ follow the shared `review-visual-<slug>.advisory.json` contract
 `plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, or manual
 dispatch); the workflow opens a lock-update PR, runs CI on it, and merges.
 Do not commit placeholder entries — `scripts/print_locked_image.py` rejects
-placeholder digests.
+placeholder digests. The same `mech_tools` entry ships inside the plugin at
+`plugins/mech/skills/mech-workflow/tools-image.json` (rewritten by the same
+workflow) so an installed plugin resolves the pinned tools image without the
+extension cache — `mech_launcher.py` checks `<plugin>/tools-image.json`,
+then `<plugin>/skills/*/tools-image.json`, then
+`docker/image-digests.json`.
+
+The tools container runs as the host uid, whose home does not exist inside
+the image: the launcher pins `HOME`/`TMPDIR`/`XDG_*` to `/tmp` instead of
+forwarding the host values so fontconfig, ezdxf and other cache-writing
+tools work. Source/image resolution still consults both `$HOME` and the
+account's real home for `~/.openhands/cache/extensions/mechanical-agent-*`,
+so a `HOME` override applied to the container does not blind the launcher.
+In `--warn` doctor mode (the SessionStart hook) the launcher reports a
+missing local image instead of pulling it.
 
 `locked-image-check.yml` (weekly + post-publish) pulls the locked tools
 image and re-runs `e2e_authoring` inside the container as the smoke check.
