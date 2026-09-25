@@ -88,11 +88,21 @@ only (a user sketch is not a fabrication document):
 
 Then say what the drawing made you think: every visual review ends with
 a subjective `impression` — what the sheet communicates well, what it
-leaves unsaid, whether a stranger could build from it. Write it in your
-reply and record it in the record's `impression` field.
+leaves unsaid, whether a stranger could build from it. The impression is
+a multi-sentence reading, not a verdict line: cover all three axes,
+naming strengths and residual gaps concretely (the record validator
+rejects anything under 240 characters or with fewer than two sentences,
+so a one-liner never reaches the file). Write it in your reply and
+record it in the record's `impression` field.
 
-Record each observation as a `vision_review` advisory record: write one
-`review-visual-<slug>.advisory.json` per image next to the design report. Do
+Review records are mandatory, not optional: every rendered image in the
+export directory — each `*.png`, `*.jpg`, and `*.svg` projection (DXF is
+read through its PNG render) — must be inspected through the vision lane
+and get a
+`review-visual-<slug>.advisory.json` next to the design report. An
+unreviewed render is unfinished work: the stop hook lists any image
+missing its record. Record each observation as a `vision_review`
+advisory record. Do
 not hand-assemble the JSON — run the `review-record` CLI so the record is
 bound to the image bytes and validated against `src/mech/advisory.py`:
 
@@ -128,8 +138,9 @@ detail, and writes the record (fail-closed on a bad payload):
 
 `checklist` is `dxf_outline` for rendered drawing projections,
 `part_render` for other part views, and `intake_image` for user-attached
-intake images. `impression` is required (a record without one fails
-validation and is discarded). `bbox` is a normalized `[x, y, w, h]`
+intake images. `impression` is required and floored at 240 characters
+with at least two sentences (a terse record fails validation and is
+discarded). `bbox` is a normalized `[x, y, w, h]`
 region when the model can localize. Finding categories include the
 drawing-quality set `ambiguous_notation`, `missing_dimension`,
 `missing_manufacturing_info`, and `design_intent`. Findings stay

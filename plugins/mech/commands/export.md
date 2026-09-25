@@ -22,5 +22,8 @@ An image you inspect visually is an observation, not a verdict: persist it
 as `review-visual-<slug>.advisory.json` with the `review-record` subcommand
 (`--image`, `--model`, `--checklist`, `--impression`, `--findings`,
 `--summary`), the same record `mech-review` writes — never hand-assembled
-JSON. This applies whether the review ran through `mech-review` or inline
-here.
+JSON. Every rendered raster must be vision-inspected — required, not
+optional — and the impression is a substantive multi-sentence reading of
+what the sheet communicates well and what it leaves unsaid (the validator
+rejects records under 240 characters or with fewer than two sentences).
+This applies whether the review ran through `mech-review` or inline here.
