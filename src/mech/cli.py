@@ -18,7 +18,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .brief import DesignBrief, load_brief
 from .doctor import run_doctor
@@ -149,6 +149,42 @@ def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
+def _cmd_review_record(args: argparse.Namespace) -> dict[str, Any]:
+    """Write `review-visual-<slug>.advisory.json` for a reviewed image.
+
+    The reviewer supplies impression/findings as JSON; this command binds
+    them to the image bytes (sha256), validates the detail against the
+    typed schema, and writes the record deterministically — instead of a
+    hand-assembled JSON that could drift from `advisory.py`.
+    """
+    from .advisory import write_review_record
+
+    image = Path(args.image)
+    try:
+        raw: Any = json.loads(Path(args.findings).read_text(encoding="utf-8"))
+        raw_list = cast(list[Any], raw) if isinstance(raw, list) else None
+        if raw_list is None or not all(isinstance(item, dict) for item in raw_list):
+            raise ValueError("findings JSON must be a list of objects")
+        findings = cast(list[dict[str, Any]], raw_list)
+        impression = (
+            Path(args.impression_file).read_text(encoding="utf-8").strip()
+            if args.impression_file
+            else (args.impression or "").strip()
+        )
+        path = write_review_record(
+            image,
+            model=args.model,
+            checklist=args.checklist,
+            impression=impression,
+            findings=findings,
+            summary=args.summary or "",
+            out_dir=Path(args.out) if args.out else None,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return {"verdict": "fail", "stage": "review-record", "detail": str(exc)}
+    return {"verdict": "pass", "record": str(path)}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mech",
@@ -206,6 +242,31 @@ def build_parser() -> argparse.ArgumentParser:
     envelope_p.add_argument("--brief", required=True)
     envelope_p.add_argument("--out", required=True)
 
+    review_p = sub.add_parser(
+        "review-record",
+        help="write a validated review-visual-<slug>.advisory.json for an image",
+    )
+    review_p.add_argument("--image", required=True, help="the image the review read")
+    review_p.add_argument("--model", required=True, help="reviewer model name")
+    review_p.add_argument(
+        "--checklist",
+        required=True,
+        choices=["dxf_outline", "part_render", "intake_image"],
+    )
+    review_p.add_argument("--summary", default=None)
+    review_p.add_argument("--out", default=None)
+    review_p.add_argument("--impression", default=None, help="subjective reading (required)")
+    review_p.add_argument(
+        "--impression-file",
+        default=None,
+        help="text file with the subjective reading (alternative to --impression)",
+    )
+    review_p.add_argument(
+        "--findings",
+        required=True,
+        help="JSON file: list of {category, severity, note, bbox?}",
+    )
+
     return parser
 
 
@@ -223,6 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         "gates": _cmd_gates,
         "dxf-lint": _cmd_dxf_lint,
         "render": _cmd_render,
+        "review-record": _cmd_review_record,
     }
     handler = handlers[args.command]
     try:

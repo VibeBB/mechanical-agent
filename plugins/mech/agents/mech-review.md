@@ -92,19 +92,48 @@ leaves unsaid, whether a stranger could build from it. Write it in your
 reply and record it in the record's `impression` field.
 
 Record each observation as a `vision_review` advisory record: write one
-`review-visual-<slug>.advisory.json` per image next to the design report, with
-`tool: "vision_review"`, `stage: "review"`, and `detail` following the
-`VisualReviewDetail` contract in `src/mech/advisory.py`:
-`{image_path, image_sha256, model, checklist, impression, findings:
-[{category, severity (error|warning|info), note, bbox?}]}`. `checklist` is
-`dxf_outline` for rendered drawing projections, `part_render` for other
-part views, and `intake_image` for user-attached intake images.
-`impression` is required (a record without one fails validation and is
-discarded). `bbox` is a normalized `[x, y, w, h]` region when the model
-can localize. Finding categories include the drawing-quality set
-`ambiguous_notation`, `missing_dimension`, `missing_manufacturing_info`,
-and `design_intent`. Findings stay advisory: never promote them to a
-verdict.
+`review-visual-<slug>.advisory.json` per image next to the design report. Do
+not hand-assemble the JSON — run the `review-record` CLI so the record is
+bound to the image bytes and validated against `src/mech/advisory.py`:
+
+```bash
+python3 plugins/mech/scripts/mech_launcher.py review-record \
+  --image <out>/drawing.png --model <model> \
+  --checklist dxf_outline --impression "<subjective reading>" \
+  --findings findings.json --summary "shell drawing front view"
+```
+
+where `findings.json` is a list of
+`{"category": ..., "severity": ..., "note": ..., "bbox": [x, y, w, h]?}`.
+The command computes `image_sha256`, fills the envelope, validates the
+detail, and writes the record (fail-closed on a bad payload):
+
+```json
+{
+  "tool": "vision_review",
+  "stage": "review",
+  "status": "ok",
+  "summary": "shell drawing front view",
+  "artifacts": ["<out>/drawing.png"],
+  "detail": {
+    "image_path": "<out>/drawing.png",
+    "image_sha256": "<sha256>",
+    "model": "<model>",
+    "checklist": "dxf_outline",
+    "impression": "<subjective reading of the drawing — required>",
+    "findings": []
+  }
+}
+```
+
+`checklist` is `dxf_outline` for rendered drawing projections,
+`part_render` for other part views, and `intake_image` for user-attached
+intake images. `impression` is required (a record without one fails
+validation and is discarded). `bbox` is a normalized `[x, y, w, h]`
+region when the model can localize. Finding categories include the
+drawing-quality set `ambiguous_notation`, `missing_dimension`,
+`missing_manufacturing_info`, and `design_intent`. Findings stay
+advisory: never promote them to a verdict.
 
 Also review parametrically: compare declared dimensions to the report's measured
 values, and sanity-check `fits[]`/`stackups[]`/`mechanism_features[]` against
