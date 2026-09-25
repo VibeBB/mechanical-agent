@@ -58,3 +58,9 @@ sub-agents through the SDK task tools (`TaskToolSet` + `AgentDefinition` +
   On `dxf_outline` drawings it reviews baseline fidelity, manufacturing
   completeness, and design intent per `plugins/mech/agents/mech-review.md`,
   and every `vision_review` record requires the `impression` field.
+
+## Terminal tool notes
+
+The terminal tool runs **one command per call**: a payload carrying several commands is bounced
+as "Cannot execute multiple commands at once". Chain with `&&` inside a single command when you
+need two steps, and write files with `file_editor` rather than multi-line heredocs.
