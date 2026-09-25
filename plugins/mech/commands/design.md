@@ -30,10 +30,13 @@ each failing check, fixes the BRIEF, and reruns. The artifacts are projections o
 brief — never edit `.step/.stl/.3mf/.dxf`, `manifest.json`, `provenance.json`, or
 `design-report.json` directly, and never weaken a process limit or threshold to pass.
 
-Finally delegate to `mech-review` for an advisory pass: visual sanity of renders/DXF
-outlines and parametric review of dimensions, fits, and mechanism rules. Its findings
-are observations only — fold them back into the brief only through `mech_author`
-re-runs or by asking the user.
+Finally — required, never skipped — delegate to `mech-review` for an advisory pass:
+visual sanity of renders/DXF outlines and parametric review of dimensions, fits, and
+mechanism rules. Every rendered image (`*.png`, `*.jpg`, `*.svg`) must be
+vision-inspected and get a `review-visual-<slug>.advisory.json` record with a
+substantive multi-sentence impression (the validator rejects terse records); an
+unreviewed render is unfinished work. Its findings are observations only — fold them
+back into the brief only through `mech_author` re-runs or by asking the user.
 
 Summarize for the user: the final `verdict`, each failing gate by id if any, the
 artifact directory, and open follow-ups (e.g. machining drawings, FEA, or

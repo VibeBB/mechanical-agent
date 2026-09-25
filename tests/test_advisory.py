@@ -13,6 +13,13 @@ from mech.advisory import (
     write_review_record,
 )
 
+LONG_IMPRESSION = (
+    "The sheet reads like a buildable drawing: the outline is dimensioned off a "
+    "declared datum, the hole table anchors every bore without ambiguity, and the "
+    "title block carries the scale and tolerance a fabricator needs. What it still "
+    "leaves unsaid is the vent-slot pitch, which has to be inferred rather than read."
+)
+
 
 def _vision_result() -> AdvisoryResult:
     return AdvisoryResult(
@@ -26,7 +33,7 @@ def _vision_result() -> AdvisoryResult:
             "image_sha256": "a" * 64,
             "model": "kimi-k3",
             "checklist": "dxf_outline",
-            "impression": "reads like a buildable sheet; dims anchored to the mating face",
+            "impression": LONG_IMPRESSION,
             "findings": [
                 {
                     "category": "text_collision",
@@ -50,7 +57,7 @@ def test_parse_visual_review_round_trip() -> None:
     assert detail is not None
     assert detail.checklist == "dxf_outline"
     assert detail.model == "kimi-k3"
-    assert detail.impression.startswith("reads like a buildable sheet")
+    assert detail.impression.startswith("The sheet reads like a buildable drawing")
     assert len(detail.findings) == 3
     assert detail.findings[0].bbox == [0.1, 0.2, 0.05, 0.03]
     assert detail.findings[1].category == "design_intent"
@@ -88,7 +95,7 @@ def test_visual_review_detail_rejects_unknown_keys() -> None:
                 "image_sha256": "a" * 64,
                 "model": "m",
                 "checklist": "dxf_outline",
-                "impression": "i",
+                "impression": LONG_IMPRESSION,
                 "verdict": "fail",
             }
         )
@@ -102,7 +109,7 @@ def test_visual_review_detail_rejects_unknown_category() -> None:
                 "image_sha256": "a" * 64,
                 "model": "m",
                 "checklist": "dxf_outline",
-                "impression": "i",
+                "impression": LONG_IMPRESSION,
                 "findings": [{"category": "silkscreen_overlap", "severity": "info", "note": "x"}],
             }
         )
@@ -121,7 +128,7 @@ def test_visual_review_detail_accepts_drawing_quality_categories() -> None:
                 "image_sha256": "a" * 64,
                 "model": "m",
                 "checklist": "dxf_outline",
-                "impression": "reads clearly",
+                "impression": LONG_IMPRESSION,
                 "findings": [{"category": category, "severity": "info", "note": "x"}],
             }
         )
@@ -143,7 +150,7 @@ def test_write_review_record_binds_image_bytes(tmp_path: Path) -> None:
         image,
         model="kimi-k3",
         checklist="dxf_outline",
-        impression="reads like a buildable sheet",
+        impression=LONG_IMPRESSION,
         findings=[
             {
                 "category": "text_collision",
@@ -161,7 +168,7 @@ def test_write_review_record_binds_image_bytes(tmp_path: Path) -> None:
     import hashlib
 
     assert detail.image_sha256 == hashlib.sha256(b"png-bytes").hexdigest()
-    assert detail.impression == "reads like a buildable sheet"
+    assert detail.impression == LONG_IMPRESSION
     assert detail.findings[0].category == "text_collision"
 
 
@@ -185,3 +192,19 @@ def test_write_review_record_rejects_bad_finding(tmp_path: Path) -> None:
             impression="",
             findings=[],
         )
+
+
+def test_parse_visual_review_rejects_terse_impression() -> None:
+    """A one-liner impression validates to None — the review is discarded."""
+    result = _vision_result()
+    assert result.detail is not None
+    result.detail["impression"] = "looks fine"
+    assert parse_visual_review(result) is None
+
+
+def test_impression_min_length_floor() -> None:
+    """Multi-sentence text under the floor still fails closed."""
+    result = _vision_result()
+    assert result.detail is not None
+    result.detail["impression"] = "A short note. With two sentences."
+    assert parse_visual_review(result) is None

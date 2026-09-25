@@ -595,3 +595,65 @@ def test_intake_attachments_uses_session_default_path(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert list((workdir / "intake" / "attachments").glob("*.png"))
+
+
+def test_record_vision_tool_event_records_actor(tmp_path: Path) -> None:
+    """Payload identity keys land on the record so each event is attributable."""
+    payload = {
+        "working_dir": str(tmp_path),
+        "session_id": "session-1",
+        "tool_name": "inspect_image_with_vision",
+        "tool_input": {"image_index": 0, "question": "Check wall thickness"},
+        "tool_response": {
+            "answer": "Walls look uniform.",
+            "profile_name": "vision",
+            "model": "vision-model-1",
+        },
+        "agent_name": "mech-review",
+        "tool_call_id": "call-7",
+    }
+
+    assert _run_vision(payload).returncode == 0
+
+    record = _vision_events(tmp_path)[0]
+    assert record["actor"] == {"agent_name": "mech-review", "tool_call_id": "call-7"}
+    assert record["tool_call_id"] == "call-7"
+
+
+def test_record_vision_tool_event_actor_absent(tmp_path: Path) -> None:
+    payload = {
+        "working_dir": str(tmp_path),
+        "tool_name": "inspect_image_with_vision",
+        "tool_input": {"image_index": 0},
+        "tool_response": {
+            "answer": "ok",
+            "profile_name": "vision",
+            "model": "m",
+        },
+    }
+
+    assert _run_vision(payload).returncode == 0
+    record = _vision_events(tmp_path)[0]
+    assert record["actor"] is None
+    assert record["tool_call_id"] is None
+
+
+def test_record_image_observation_records_actor(tmp_path: Path) -> None:
+    image = tmp_path / "renders" / "enclosure.png"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(_PNG)
+    payload = {
+        "working_dir": str(tmp_path),
+        "tool_name": "file_editor",
+        "tool_input": {"command": "view", "path": str(image)},
+        "tool_response": {"output": "ok"},
+        "session_id": "s1",
+        "subagent_type": "mech-design",
+        "action_id": "act-3",
+    }
+
+    assert _run_observe(payload).returncode == 0
+
+    record = _observations(tmp_path)[0]
+    assert record["actor"] == {"action_id": "act-3", "subagent_type": "mech-design"}
+    assert record["tool_call_id"] == "act-3"
