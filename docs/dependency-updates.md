@@ -58,7 +58,7 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 
 | Item | Pin | Where |
 | --- | --- | --- |
-| ubuntu base image | `26.04` | `docker/mech-tools.Dockerfile` `FROM` |
+| debian base image | `13-slim` | `docker/mech-tools.Dockerfile` `FROM` |
 | uv | `0.12.18` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
 | Python in image | `3.12` | `uv python install` inside the Dockerfile |
 | librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
@@ -83,11 +83,12 @@ state columns `update available` / `deferred` / `up to date`. Surfaces:
 - `docker-arg` — Dockerfile `ARG UV_VERSION` against the latest
   `astral-sh/uv` tag; the ARG is asserted equal to `[tool.uv]
   required-version` by a unit test.
-- `docker-base` — `FROM ubuntu:YY.MM` against the newest Ubuntu `YY.04`
-  LTS tag on Docker Hub.
+- `docker-base` — `FROM debian:N-slim` against the newest Debian `N-slim`
+  tag on Docker Hub (a `ubuntu:YY.MM` base is also understood and compared
+  against the newest Ubuntu `YY.04` LTS tag).
 - `apt` — unpinned apt packages the Dockerfile installs for external tools
   (`APT_PACKAGES` in the checker; currently `librsvg2-bin` for the
-  `mech_render` rasterizer). Apt versions track the Ubuntu archive, so the
+  `mech_render` rasterizer). Apt versions track the Debian archive, so the
   surface reports presence, not upgrades: a package absent from the
   Dockerfile is flagged instead.
 

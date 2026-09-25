@@ -43,7 +43,7 @@ publish workflow also builds `mech-server` (OpenHands agent-server target
 - `ghcr.io/<owner>/mech-tools:<sha>-tools` (immutable) + `:latest`
 - `ghcr.io/<owner>/mech-server:<sha>-latest-source` + `:latest`
 
-The tools image installs `librsvg2-bin` (unpinned Ubuntu 26.04 apt) for
+The tools image installs `librsvg2-bin` (unpinned Debian 13 apt) for
 `mech_render` / `python -m mech render`, which turns an exported `.dxf`
 into an `.svg` (ezdxf `SVGBackend`, in-process) plus a `.png`
 (`rsvg-convert`, override via `$MECH_RSVG_CONVERT`) so the vision lane can

@@ -22,7 +22,7 @@ The `mech-tools` image bundles the following third-party components:
 | Component | License | Use |
 | --- | --- | --- |
 | uv (binary, copied from `ghcr.io/astral-sh/uv`) | Apache-2.0 OR MIT | Python environment and interpreter provisioning |
-| Ubuntu base image (`ubuntu:26.04`) | various (per-package copyrights in `/usr/share/doc/`) | base image + system libraries for OCP (mesa, X11, freetype) |
+| Debian base image (`debian:13-slim`) | various (per-package copyrights in `/usr/share/doc/`) | base image + system libraries for OCP (mesa, X11, freetype) |
 
 ## Development tools
 
