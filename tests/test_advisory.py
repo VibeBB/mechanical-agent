@@ -1,10 +1,16 @@
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from mech.advisory import (
     AdvisoryResult,
     VisualReviewDetail,
+    build_review_record,
     parse_visual_review,
+    review_record_path,
+    write_review_record,
 )
 
 
@@ -120,3 +126,62 @@ def test_visual_review_detail_accepts_drawing_quality_categories() -> None:
             }
         )
         assert detail.findings[0].category == category
+
+
+def test_review_record_path_slugifies(tmp_path: Path) -> None:
+    path = review_record_path(tmp_path / "Shell Drawing.PNG")
+    assert path.name == "review-visual-shell-drawing.advisory.json"
+    assert path.parent == tmp_path
+    out = review_record_path(tmp_path / "x.png", tmp_path / "reports")
+    assert out.parent == tmp_path / "reports"
+
+
+def test_write_review_record_binds_image_bytes(tmp_path: Path) -> None:
+    image = tmp_path / "lid.png"
+    image.write_bytes(b"png-bytes")
+    path = write_review_record(
+        image,
+        model="kimi-k3",
+        checklist="dxf_outline",
+        impression="reads like a buildable sheet",
+        findings=[
+            {
+                "category": "text_collision",
+                "severity": "warning",
+                "note": "dim text overlaps hatch",
+            }
+        ],
+        summary="lid outline",
+    )
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert record["tool"] == "vision_review"
+    assert record["stage"] == "review"
+    detail = parse_visual_review(AdvisoryResult.model_validate(record))
+    assert detail is not None
+    import hashlib
+
+    assert detail.image_sha256 == hashlib.sha256(b"png-bytes").hexdigest()
+    assert detail.impression == "reads like a buildable sheet"
+    assert detail.findings[0].category == "text_collision"
+
+
+def test_write_review_record_rejects_bad_finding(tmp_path: Path) -> None:
+    image = tmp_path / "lid.png"
+    image.write_bytes(b"png-bytes")
+    with pytest.raises(ValidationError):
+        build_review_record(
+            image,
+            model="kimi-k3",
+            checklist="dxf_outline",
+            impression="i",
+            findings=[{"category": "not-a-category", "severity": "info", "note": "x"}],
+        )
+    # impression is required — fail closed rather than writing a record
+    with pytest.raises(ValidationError):
+        build_review_record(
+            image,
+            model="kimi-k3",
+            checklist="dxf_outline",
+            impression="",
+            findings=[],
+        )

@@ -17,3 +17,10 @@ parts and write the assembly STEP, per-part STEP/STL/DXF, the combined 3MF,
 `manifest.json` (per-file sha256), and `provenance.json`. Export does not run gates —
 use `/mech:gates` or `mech_author` when a verdict is needed. Never write artifacts to
 paths the protect-generated hook protects by hand-editing; always export.
+
+An image you inspect visually is an observation, not a verdict: persist it
+as `review-visual-<slug>.advisory.json` with the `review-record` subcommand
+(`--image`, `--model`, `--checklist`, `--impression`, `--findings`,
+`--summary`), the same record `mech-review` writes — never hand-assembled
+JSON. This applies whether the review ran through `mech-review` or inline
+here.
