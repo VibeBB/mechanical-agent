@@ -10,6 +10,13 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Any
 
+# Unions weld into their host face by this depth; a coplanar contact
+# produces a non-manifold mesh on export.
+WELD_MM = 0.1
+# Extra depth a subtracted prism extends past the faces it cuts so the cut
+# fully pierces them.
+CUT_OVER_MM = 2.0
+
 
 def build123d() -> Any:
     return importlib.import_module("build123d")

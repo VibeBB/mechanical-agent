@@ -18,11 +18,9 @@ from ..brief import (
     vent_slot_count,
 )
 from ..standards import thread
-from .common import GeneratedDesign, GeneratedPart, ReferenceSolid, build123d
+from .common import CUT_OVER_MM, WELD_MM, GeneratedDesign, GeneratedPart, ReferenceSolid, build123d
 
-CUT_OVER_MM = 2.0  # extra prism depth beyond each wall face
 SNAP_FIT_GAP_MM = 0.2  # radial gap between lid skirt and shell cavity
-WELD_MM = 0.1  # overlap depth to keep unions off coincident faces
 
 
 standoff_geometry = standoff_diameters

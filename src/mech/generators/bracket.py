@@ -13,10 +13,8 @@ from __future__ import annotations
 from typing import Any
 
 from ..brief import BracketHole, BracketSpec, DesignBrief
-from .common import GeneratedDesign, GeneratedPart, build123d
+from .common import CUT_OVER_MM, WELD_MM, GeneratedDesign, GeneratedPart, build123d
 from .features import attach_rib, attach_snap_fit
-
-CUT_OVER_MM = 2.0
 
 
 class _BracketWallHost:
@@ -87,10 +85,14 @@ def _gusset(spec: BracketSpec) -> Any | None:
     solid = b.extrude(triangle, amount=spec.thickness_mm / 2, both=True)
     # Origin at the inner corner (leg inner face, base top): first sketch leg
     # runs +X along the base, second runs +Z up the leg, thickness centred on Y.
-    # Shifted 0.1 mm into both faces so the union welds rather than touching
+    # Shifted WELD_MM into both faces so the union welds rather than touching
     # coplanar surfaces (tangent contacts produce a non-manifold mesh).
     return (
-        b.Pos(-spec.base_mm / 2 + spec.thickness_mm - 0.1, 0, spec.thickness_mm - 0.1)
+        b.Pos(
+            -spec.base_mm / 2 + spec.thickness_mm - WELD_MM,
+            0,
+            spec.thickness_mm - WELD_MM,
+        )
         * b.Rot(90, 0, 0)
         * solid
     )
