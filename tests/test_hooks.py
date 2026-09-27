@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 HOOKS = Path(__file__).parents[1] / "plugins" / "mech" / "hooks" / "scripts"
 PROTECT_SCRIPT = HOOKS / "protect_generated.py"
 STATUS_SCRIPT = HOOKS / "report_design_status.py"
@@ -464,6 +466,26 @@ def test_record_image_observation_skips_non_images_and_errors(tmp_path: Path) ->
         },
     ):
         assert _run_observe(payload).returncode == 0
+    assert _observations(tmp_path) == []
+
+
+def test_record_image_observation_reports_unreadable_image(tmp_path: Path) -> None:
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses file permission checks")
+    unreadable = tmp_path / "render.png"
+    unreadable.write_bytes(_PNG)
+    unreadable.chmod(0)
+    result = _run_observe(
+        {
+            "working_dir": str(tmp_path),
+            "tool_name": "file_editor",
+            "tool_input": {"command": "view", "path": str(unreadable)},
+            "tool_response": {"output": "ok"},
+        }
+    )
+    assert result.returncode == 0
+    assert "image observation skipped (unreadable)" in result.stderr
+    assert str(unreadable) in result.stderr
     assert _observations(tmp_path) == []
 
 
