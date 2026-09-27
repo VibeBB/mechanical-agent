@@ -400,15 +400,14 @@ class DesignBrief(BaseModel):
             raise ValueError(f"unsupported material: {self.material}")
         if self.process not in PROCESS_KEYS:
             raise ValueError(f"unsupported process: {self.process}")
-        spec = getattr(self, self.design_type)
-        if spec is None:
-            raise ValueError(f"design_type={self.design_type} requires its spec block")
-        others = {
+        specs = {
             "enclosure": self.enclosure,
             "bracket": self.bracket,
             "spur_gear": self.spur_gear,
         }
-        for key, value in others.items():
+        if specs[self.design_type] is None:
+            raise ValueError(f"design_type={self.design_type} requires its spec block")
+        for key, value in specs.items():
             if key != self.design_type and value is not None:
                 raise ValueError(f"{key} spec must be null for design_type={self.design_type}")
         if self.design_type == "spur_gear" and self.mechanism_features:
