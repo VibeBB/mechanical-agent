@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from ..brief import MechanismFeature
-from .common import build123d
+from .common import WELD_MM, build123d
 
 _WALL_ANGLE = {
     "left": 0.0,
@@ -22,10 +22,6 @@ _WALL_ANGLE = {
     "front": 90.0,
     "back": -90.0,
 }
-
-# Features weld into their host face by this depth; a coplanar contact
-# produces a non-manifold mesh on export.
-_WELD_MM = 0.1
 
 
 class WallHost(Protocol):
@@ -71,11 +67,11 @@ def attach_snap_fit(feature: MechanismFeature, spec: WallHost) -> Any:
     length = feature.length_mm
     hook_l = min(0.2 * length, 1.5 * t)
     loc = _wall_location(feature, spec)
-    beam = loc * b.Pos(t / 2 - _WELD_MM, 0, length / 2) * b.Box(t, w, length)
+    beam = loc * b.Pos(t / 2 - WELD_MM, 0, length / 2) * b.Box(t, w, length)
     hook = (
         loc
         * b.Pos(
-            (t - feature.deflection_mm) / 2 - _WELD_MM,
+            (t - feature.deflection_mm) / 2 - WELD_MM,
             0,
             length - hook_l / 2,
         )
@@ -89,9 +85,9 @@ def attach_rib(feature: MechanismFeature, spec: WallHost) -> Any:
     b = build123d()
     loc = _wall_location(feature, spec)
     triangle = b.Polygon(
-        (-_WELD_MM, 0),
+        (-WELD_MM, 0),
         (feature.length_mm, 0),
-        (-_WELD_MM, feature.height_mm),
+        (-WELD_MM, feature.height_mm),
         align=(b.Align.NONE, b.Align.NONE),
     )
     return loc * b.extrude(
@@ -105,14 +101,14 @@ def attach_boss(feature: MechanismFeature, spec: WallHost) -> Any:
     """Boss on the floor top face at (x_mm, y_mm), id hole blind."""
     b = build123d()
     h = feature.height_mm or feature.od_mm
-    boss = b.Pos(feature.x_mm, feature.y_mm, spec.floor_mm - _WELD_MM) * b.Cylinder(
+    boss = b.Pos(feature.x_mm, feature.y_mm, spec.floor_mm - WELD_MM) * b.Cylinder(
         radius=feature.od_mm / 2,
-        height=h + _WELD_MM,
+        height=h + WELD_MM,
         align=(b.Align.CENTER, b.Align.CENTER, b.Align.MIN),
     )
-    boss -= b.Pos(feature.x_mm, feature.y_mm, spec.floor_mm - _WELD_MM) * b.Cylinder(
+    boss -= b.Pos(feature.x_mm, feature.y_mm, spec.floor_mm - WELD_MM) * b.Cylinder(
         radius=feature.id_mm / 2,
-        height=h + _WELD_MM + 0.1,
+        height=h + WELD_MM + 0.1,
         align=(b.Align.CENTER, b.Align.CENTER, b.Align.MIN),
     )
     return boss

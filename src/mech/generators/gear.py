@@ -13,7 +13,7 @@ import math
 from typing import Any
 
 from ..brief import DesignBrief, SpurGearSpec
-from .common import GeneratedDesign, GeneratedPart, build123d
+from .common import CUT_OVER_MM, GeneratedDesign, GeneratedPart, build123d
 
 _INVOLUTE_STEPS = 12
 _ROOT_CLEARANCE = 1.25  # dedendum factor (standard full-depth tooth)
@@ -102,7 +102,7 @@ def _gear_solid(spec: SpurGearSpec) -> Any:
         gear += b.Pos(0, 0, 0) * b.Rot(0, 0, math.degrees(2 * math.pi * i / z)) * tooth
     gear -= b.Cylinder(
         radius=spec.bore_mm / 2,
-        height=spec.thickness_mm + 2.0,
+        height=spec.thickness_mm + CUT_OVER_MM,
         align=(b.Align.CENTER, b.Align.CENTER, b.Align.CENTER),
     )
     if spec.hub_diameter_mm > 0 and spec.hub_height_mm > 0:
@@ -113,7 +113,7 @@ def _gear_solid(spec: SpurGearSpec) -> Any:
         )
         hub -= b.Cylinder(
             radius=spec.bore_mm / 2,
-            height=spec.hub_height_mm + 2.0,
+            height=spec.hub_height_mm + CUT_OVER_MM,
         )
         gear += hub
     return gear
