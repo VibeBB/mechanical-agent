@@ -105,7 +105,8 @@ the image publish job (the lock-update PR needs push credentials).
 
 1. `bump-version` runs `scripts/bump_version.py` (`--bump patch|minor|major`
    or `--set X.Y.Z`), updates `plugins/mech/.plugin/plugin.json`,
-   `pyproject.toml`, `uv.lock`, commits to main, and refuses if the tag
+   `pyproject.toml`, `plugins/mech/skills/*/SKILL.md`, `uv.lock`, commits to
+   main, and refuses if the tag
    already exists. With `version=` equal to current it skips the commit and
    releases current HEAD.
 2. `verify` re-runs CI at the bumped SHA.
