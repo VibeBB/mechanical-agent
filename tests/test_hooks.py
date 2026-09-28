@@ -470,6 +470,26 @@ def test_record_image_observation_skips_non_images_and_errors(tmp_path: Path) ->
     assert _observations(tmp_path) == []
 
 
+def test_record_image_observation_reports_unreadable_image(tmp_path: Path) -> None:
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses file permission checks")
+    unreadable = tmp_path / "render.png"
+    unreadable.write_bytes(_PNG)
+    unreadable.chmod(0)
+    result = _run_observe(
+        {
+            "working_dir": str(tmp_path),
+            "tool_name": "file_editor",
+            "tool_input": {"command": "view", "path": str(unreadable)},
+            "tool_response": {"output": "ok"},
+        }
+    )
+    assert result.returncode == 0
+    assert "image observation skipped (unreadable)" in result.stderr
+    assert str(unreadable) in result.stderr
+    assert _observations(tmp_path) == []
+
+
 def test_hook_scripts_return_zero_on_malformed_stdin() -> None:
     for script in (VISION_SCRIPT, OBSERVE_SCRIPT, STATUS_SCRIPT):
         result = subprocess.run(

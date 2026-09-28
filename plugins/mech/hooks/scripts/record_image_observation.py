@@ -112,7 +112,11 @@ def main() -> int:
             for image_path in paths:
                 try:
                     digest = hashlib.sha256(image_path.read_bytes()).hexdigest()
-                except OSError:
+                except OSError as exc:
+                    print(
+                        f"image observation skipped (unreadable): {image_path}: {exc}",
+                        file=sys.stderr,
+                    )
                     continue
                 identity = {
                     "sequence": sequence,
