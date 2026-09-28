@@ -2,12 +2,15 @@
 
 import base64
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 HOOKS = Path(__file__).parents[1] / "plugins" / "mech" / "hooks" / "scripts"
 PROTECT_SCRIPT = HOOKS / "protect_generated.py"
@@ -657,3 +660,62 @@ def test_record_image_observation_records_actor(tmp_path: Path) -> None:
     record = _observations(tmp_path)[0]
     assert record["actor"] == {"action_id": "act-3", "subagent_type": "mech-design"}
     assert record["tool_call_id"] == "act-3"
+
+
+def test_record_hooks_share_provenance_contract(tmp_path: Path) -> None:
+    """Both observation hooks attribute the same actor and emit 64-hex ids."""
+    image = tmp_path / "renders" / "part.png"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(_PNG)
+    base = {
+        "working_dir": str(tmp_path),
+        "session_id": "s1",
+        "agent_name": "mech-design",
+        "tool_call_id": "call-7",
+    }
+    vision_payload = {
+        **base,
+        "tool_name": "inspect_image_with_vision",
+        "tool_input": {"image_index": 0, "question": "q"},
+        "tool_response": {"answer": "a", "profile_name": "vision", "model": "m"},
+    }
+    observe_payload = {
+        **base,
+        "tool_name": "file_editor",
+        "tool_input": {"command": "view", "path": str(image)},
+        "tool_response": {"output": "ok"},
+    }
+
+    assert _run_vision(vision_payload).returncode == 0
+    assert _run_observe(observe_payload).returncode == 0
+
+    vision = _vision_events(tmp_path)[0]
+    observe = _observations(tmp_path)[0]
+    expected_actor = {"agent_name": "mech-design", "tool_call_id": "call-7"}
+    assert vision["actor"] == observe["actor"] == expected_actor
+    assert len(vision["event_id"]) == len(observe["event_id"]) == 64
+    int(vision["event_id"], 16)
+    int(observe["event_id"], 16)
+
+
+def test_provenance_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = importlib.util.spec_from_file_location("_provenance", HOOKS / "_provenance.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    missing = tmp_path / "missing.jsonl"
+    assert module.next_sequence(missing) == 1
+    missing.write_text("a\nb\n", encoding="utf-8")
+    assert module.next_sequence(missing) == 3
+
+    payload: dict[str, Any] = {"working_dir": str(tmp_path)}
+    rel = Path("observations/x.jsonl")
+    env = "MECH_TEST_EVENTS"
+    monkeypatch.delenv(env, raising=False)
+    assert module.events_path(payload, env, rel) == tmp_path / rel
+    monkeypatch.setenv(env, "sub/log.jsonl")
+    assert module.events_path(payload, env, rel) == tmp_path / "sub" / "log.jsonl"
+    absolute = tmp_path / "abs" / "log.jsonl"
+    monkeypatch.setenv(env, str(absolute))
+    assert module.events_path(payload, env, rel) == absolute
