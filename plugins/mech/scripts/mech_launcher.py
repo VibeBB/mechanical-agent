@@ -43,7 +43,7 @@ import sys
 from pathlib import Path
 
 _MODULES = {
-    "mcp_server": ("mech.mcp_server",),
+    "mcp_server": "mech.mcp_server",
 }
 
 _CONTAINER_SRC = "/plugin-src"
