@@ -20,7 +20,7 @@ from . import dfm as dfm_rules
 from . import fits as fits_rules
 from . import mechanism as mech_rules
 from . import stackup as stackup_rules
-from .brief import DesignBrief, brief_sha256
+from .brief import DesignBrief, EnclosureSpec, brief_sha256
 from .generators.common import GeneratedDesign, build123d
 
 CheckStatus = Literal["pass", "fail", "unknown"]
@@ -354,7 +354,7 @@ def _opening_checks(brief: DesignBrief, design: GeneratedDesign) -> list[GateChe
     return checks
 
 
-def _wall_band(spec: Any, face: str) -> Any:
+def _wall_band(spec: EnclosureSpec, face: str) -> Any:
     """Box spanning exactly the wall/floor/lid band of the named face."""
     b = build123d()
     w, d, h = spec.width_mm, spec.depth_mm, spec.height_mm
