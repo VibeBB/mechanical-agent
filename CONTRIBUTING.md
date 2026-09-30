@@ -7,7 +7,7 @@ read [AGENTS.md](AGENTS.md) first; the short version is below.
 
 - English only: issues, PRs, commits, docs, comments, identifiers
   (README keeps a Japanese appendix).
-- Python ≥ 3.12, uv `==0.12.18`, ruff, pyright strict, pytest.
+- Python ≥ 3.12, uv `==0.12.21`, ruff, pyright strict, pytest.
 - All pass/fail logic lives in `src/mech` deterministic gates. LLM output,
   reviews, and vision observations never produce verdicts.
 - Fail-closed: missing tools, parse failures, unexecuted gates, and
