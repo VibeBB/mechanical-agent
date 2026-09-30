@@ -129,13 +129,14 @@ def test_cli_render_fail_closed(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert out["verdict"] == "fail"
 
 
-def test_mcp_render(tmp_path: Path):
+def test_mcp_render(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     if _RSVG is None:
         pytest.skip("rsvg-convert not installed")
     from mcp import types
 
     from mech.mcp_server import call_tool
 
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     dxf = _dxf(tmp_path)
     result = call_tool("mech_render", {"dxf_path": str(dxf)})
     assert not result.isError
@@ -150,9 +151,10 @@ def test_mcp_render(tmp_path: Path):
     assert image_blocks[0].mimeType == "image/png"
 
 
-def test_mcp_render_fail_closed(tmp_path: Path):
+def test_mcp_render_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from mech.mcp_server import call_tool
 
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     result = call_tool("mech_render", {"dxf_path": str(tmp_path / "nope.dxf")})
     assert result.isError
 

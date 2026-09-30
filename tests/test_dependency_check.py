@@ -32,6 +32,7 @@ def test_project_dependencies_parsed():
     assert "build123d" in deps
     assert "openhands-sdk" in deps
     assert "pytest" in deps
+    assert "pytest-cov" in deps
 
 
 def test_lock_versions_cover_direct_deps():
@@ -41,6 +42,7 @@ def test_lock_versions_cover_direct_deps():
     assert missing == []
     assert versions["build123d"] == "0.13.0"
     assert versions["openhands-sdk"] == "1.50.0"
+    assert versions["pytest-cov"] == "7.1.0"
 
 
 def test_uv_pin_parsed():

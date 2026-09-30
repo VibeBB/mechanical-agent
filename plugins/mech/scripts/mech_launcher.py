@@ -41,11 +41,14 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 _MODULES = {
     "mcp_server": "mech.mcp_server",
 }
 
+_INSPECT_TIMEOUT_S = 30
+_PULL_TIMEOUT_S = 900
 _CONTAINER_SRC = "/plugin-src"
 _ENV_PREFIXES = ("OPENHANDS_", "MECH_")
 _ENV_KEYS = ("TMPDIR",)
@@ -134,13 +137,22 @@ def _lock_entry_ref(lock_path: Path, key: str | None) -> str | None:
         data = json.loads(lock_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    entry = data.get(key) if key else data
-    if not isinstance(entry, dict) or not entry.get("image"):
+    if not isinstance(data, dict):
         return None
-    if entry.get("digest"):
-        return f"{entry['image']}@{entry['digest']}"
-    if entry.get("tag"):
-        return f"{entry['image']}:{entry['tag']}"
+    data = cast(dict[str, object], data)
+    entry = data.get(key) if key else data
+    if not isinstance(entry, dict):
+        return None
+    entry = cast(dict[str, object], entry)
+    image = entry.get("image")
+    if not isinstance(image, str) or not image:
+        return None
+    digest = entry.get("digest")
+    if isinstance(digest, str) and digest:
+        return f"{image}@{digest}"
+    tag = entry.get("tag")
+    if isinstance(tag, str) and tag:
+        return f"{image}:{tag}"
     return None
 
 
@@ -182,29 +194,33 @@ def _ensure_image(plugin_root: Path, *, pull: bool = True) -> str:
             "no mech tools image resolvable: set MECH_TOOLS_IMAGE or pin "
             "image+digest in tools-image.json / docker/image-digests.json"
         )
-    if (
-        subprocess.run(
+    try:
+        inspect = subprocess.run(
             [docker, "image", "inspect", ref],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
-        ).returncode
-        == 0
-    ):
+            timeout=_INSPECT_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"docker image inspect timed out after {_INSPECT_TIMEOUT_S}s") from exc
+    if inspect.returncode == 0:
         return ref
     if not pull:
         raise RuntimeError(
             f"mech tools image {ref} not pulled locally; run 'mech_launcher.py prewarm' to fetch it"
         )
     print(f"mech_launcher: pulling tools image {ref}", file=sys.stderr)
-    if (
-        subprocess.run(
+    try:
+        pull_result = subprocess.run(
             [docker, "pull", ref],
             check=False,
             stdout=subprocess.DEVNULL,
-        ).returncode
-        == 0
-    ):
+            timeout=_PULL_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"docker pull timed out after {_PULL_TIMEOUT_S}s") from exc
+    if pull_result.returncode == 0:
         return ref
     raise RuntimeError(f"mech tools image {ref} not present locally and pull failed")
 
@@ -224,10 +240,14 @@ def _docker_argv(image: str, source: Path | None, inner_argv: list[str]) -> list
         f"{workdir}:{workdir}",
         "-w",
         workdir,
+        "-e",
+        f"OPENHANDS_PROJECT_DIR={workdir}",
     ]
     if source is not None:
         argv += ["-v", f"{source}:{_CONTAINER_SRC}:ro", "-e", f"PYTHONPATH={_CONTAINER_SRC}"]
     for key, value in os.environ.items():
+        if key == "OPENHANDS_PROJECT_DIR":
+            continue
         if key in _ENV_KEYS or any(key.startswith(p) for p in _ENV_PREFIXES):
             argv += ["-e", f"{key}={value}"]
     for key, value in _CONTAINER_ENV.items():

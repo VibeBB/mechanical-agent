@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- MCP path arguments are confined to the workspace, Docker image inspect and
+  pull operations fail closed on timeout, and exports record skipped DXF
+  outlines without changing manifests when none are skipped.
+- Fast verification enforces an 83% line-coverage threshold and checks the
+  shared canonical hooks.
 - Docker-only runtime: `mech_launcher.py` no longer falls back to a local
   `docker build` when no pinned image resolves — `$MECH_TOOLS_IMAGE` or a
   digest lock (`tools-image.json` / `docker/image-digests.json`) is now

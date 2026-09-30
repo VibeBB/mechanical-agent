@@ -157,6 +157,50 @@ def test_mcp_bad_arguments_fail_closed():
     assert result.isError
 
 
+def test_mcp_rejects_paths_outside_workspace(
+    enclosure_brief_dict: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from mech.mcp_server import call_tool
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(workspace))
+    traversal = call_tool("mech_render", {"dxf_path": "../outside.dxf"})
+    absolute = call_tool(
+        "mech_export_envelope",
+        {
+            "brief": enclosure_brief_dict,
+            "out_path": str(tmp_path / "outside.envelope.json"),
+        },
+    )
+
+    assert traversal.isError
+    assert absolute.isError
+    assert "outside the workspace" in _tool_payload(traversal)["failure_reason"]
+    assert "outside the workspace" in _tool_payload(absolute)["failure_reason"]
+
+
+def test_mcp_export_envelope_accepts_relative_workspace_path(
+    enclosure_brief_dict: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from mech.mcp_server import call_tool
+
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    brief = {
+        **enclosure_brief_dict,
+        "harness_anchors": [
+            {"name": "fixture", "kind": "clip", "position_mm": [0, 0, 0]},
+        ],
+    }
+    result = call_tool(
+        "mech_export_envelope",
+        {"brief": brief, "out_path": "contracts/demo.envelope.json"},
+    )
+
+    assert not result.isError
+    assert (tmp_path / "contracts" / "demo.envelope.json").is_file()
+
+
 def test_mcp_tool_annotations():
     from mech.mcp_server import tool_specs
 

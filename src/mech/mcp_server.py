@@ -29,6 +29,7 @@ from .standards import (
     MATERIALS,
     PROCESS_LIMITS,
 )
+from .workspace import reject_symlinks, workspace_path
 
 server: Server = Server(f"mech-mcp/{__version__}")
 
@@ -187,6 +188,15 @@ def _image_content(path: Path) -> types.ImageContent | None:
     return types.ImageContent(type="image", data=data, mimeType=mime)
 
 
+def _path_arg(arguments: dict[str, Any], key: str) -> Path:
+    return workspace_path(arguments[key])
+
+
+def _optional_path_arg(arguments: dict[str, Any], key: str) -> Path | None:
+    value = arguments.get(key)
+    return workspace_path(value) if value else None
+
+
 def _standards_payload(kind: str) -> dict[str, Any]:
     if kind == "materials":
         return {
@@ -226,7 +236,8 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     from .report import write_report
 
     brief = DesignBrief.model_validate(arguments["brief"])
-    out_dir = Path(arguments["out_dir"])
+    out_dir = _path_arg(arguments, "out_dir")
+    reject_symlinks(out_dir)
     design = generate(brief)
     if name == "mech_author":
         export_design(brief, design, out_dir)
@@ -281,7 +292,9 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             from .envelope import write_envelope
 
             brief = DesignBrief.model_validate(arguments["brief"])
-            out_path = write_envelope(brief, Path(arguments["out_path"]))
+            out_path_arg = _path_arg(arguments, "out_path")
+            reject_symlinks(out_path_arg)
+            out_path = write_envelope(brief, out_path_arg)
             return _ok(
                 {
                     "verdict": "pass",
@@ -295,21 +308,29 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         if name == "mech_dxf_lint":
             from .dxf_lint import lint_file
 
+            drawing_path = _path_arg(arguments, "drawing_path")
+            output_path = _optional_path_arg(arguments, "output_path")
+            if output_path is not None:
+                reject_symlinks(output_path)
             report = lint_file(
-                Path(arguments["drawing_path"]),
-                Path(arguments["output_path"]) if arguments.get("output_path") else None,
+                drawing_path,
+                output_path,
             )
             return _ok(report.model_dump(mode="json"))
         if name == "mech_render":
             from .render import render_dxf
 
+            dxf_path = _path_arg(arguments, "dxf_path")
+            out_path = _optional_path_arg(arguments, "out_path")
+            baseline_path = _optional_path_arg(arguments, "baseline_path")
+            for path in (out_path, baseline_path):
+                if path is not None:
+                    reject_symlinks(path)
             render = render_dxf(
-                Path(arguments["dxf_path"]),
-                Path(arguments["out_path"]) if arguments.get("out_path") else None,
+                dxf_path,
+                out_path,
                 dpi=int(arguments.get("dpi", 200)),
-                baseline_path=(
-                    Path(arguments["baseline_path"]) if arguments.get("baseline_path") else None
-                ),
+                baseline_path=baseline_path,
             )
             payload: dict[str, Any] = {
                 "verdict": "pass",

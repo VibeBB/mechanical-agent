@@ -22,6 +22,7 @@ the adoption decision for each. Update it in the same change that touches
 | packaging | `>=26` | Used by `scripts/check_dependency_updates.py` |
 | pyright | `>=1.1.414` | strict mode |
 | pytest | `>=9` | suite runner |
+| pytest-cov | `==7.1.0` | Line-coverage gate in the fast verification stage |
 | pytest-xdist | `>=3` | `-n auto --dist loadgroup` |
 | ruff | `>=0.16` | lint + format |
 

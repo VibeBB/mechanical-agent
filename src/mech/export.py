@@ -71,20 +71,19 @@ def _slice_z(brief: DesignBrief, part_id: str) -> float:
     return 0.0
 
 
-def _top_outline(shape: Any, z_mm: float) -> Any | None:
+def _top_outline(shape: Any, z_mm: float) -> tuple[Any | None, str | None]:
     """Largest-area XY-planar face of a thin slice at z_mm, flattened to Z=0."""
-    b = build123d()
-    slab = b.Pos(0, 0, z_mm) * b.Box(1e6, 1e6, _SLICE_THICKNESS_MM)
     try:
+        b = build123d()
+        slab = b.Pos(0, 0, z_mm) * b.Box(1e6, 1e6, _SLICE_THICKNESS_MM)
         sliced = shape & slab
-    except Exception:
-        return None
-    faces = sliced.faces().filter_by(b.Plane.XY)
-    if len(faces) == 0:
-        return None
-    # Deterministic pick: highest Z, then largest area among coplanar ties.
-    top = max(faces, key=lambda f: (round(f.center().Z, 6), f.area))
-    return top.moved(b.Pos(0, 0, -top.center().Z))
+        faces = sliced.faces().filter_by(b.Plane.XY)
+        if len(faces) == 0:
+            return None, f"no XY-planar face at z={z_mm} mm"
+        top = max(faces, key=lambda f: (round(f.center().Z, 6), f.area))
+        return top.moved(b.Pos(0, 0, -top.center().Z)), None
+    except Exception as exc:
+        return None, f"slice failed: {type(exc).__name__}: {exc}"
 
 
 def _sha256_file(path: Path) -> str:
@@ -129,6 +128,7 @@ def export_design(
         _normalize_step(ref_path)
         record(ref_path, "step", reference.reference_id)
 
+    skipped: list[dict[str, str]] = []
     for part in design.parts:
         part_step = out_dir / f"{name}-{part.part_id}.step"
         b.export_step(b.Compound(children=[part.shape]), str(part_step))
@@ -139,30 +139,39 @@ def export_design(
         b.export_stl(b.Compound(children=[part.shape]), str(stl_path))
         record(stl_path, "stl", part.part_id)
 
-        outline = _top_outline(part.shape, _slice_z(brief, part.part_id))
-        if outline is not None:
-            dxf_path = out_dir / f"{name}-{part.part_id}.dxf"
-            exporter = b.ExportDXF()
-            exporter.add_shape(outline)
-            exporter.write(str(dxf_path))
-            dxf_annotate.annotate_dxf(
-                dxf_path,
-                design=name,
-                part_id=part.part_id,
-                material=brief.material,
-                process=brief.process,
-                fits=brief.fits,
-                enclosure=brief.enclosure,
+        z_mm = _slice_z(brief, part.part_id)
+        outline, reason = _top_outline(part.shape, z_mm)
+        if outline is None:
+            skipped.append(
+                {
+                    "part_id": part.part_id,
+                    "kind": "dxf",
+                    "reason": reason or f"no XY-planar face at z={z_mm} mm",
+                }
             )
-            record(dxf_path, "dxf", part.part_id)
-            lint_report = dxf_lint.lint_text(
-                dxf_path.read_text(encoding="utf-8", errors="replace"),
-                source=Path(dxf_path.name),
-            )
-            lint_out = lint_report.model_dump_json(indent=2) + "\n"
-            lint_path = out_dir / f"{dxf_path.name}_lint.json"
-            lint_path.write_text(lint_out, encoding="utf-8")
-            record(lint_path, "dxf_lint", part.part_id)
+            continue
+        dxf_path = out_dir / f"{name}-{part.part_id}.dxf"
+        exporter = b.ExportDXF()
+        exporter.add_shape(outline)
+        exporter.write(str(dxf_path))
+        dxf_annotate.annotate_dxf(
+            dxf_path,
+            design=name,
+            part_id=part.part_id,
+            material=brief.material,
+            process=brief.process,
+            fits=brief.fits,
+            enclosure=brief.enclosure,
+        )
+        record(dxf_path, "dxf", part.part_id)
+        lint_report = dxf_lint.lint_text(
+            dxf_path.read_text(encoding="utf-8", errors="replace"),
+            source=Path(dxf_path.name),
+        )
+        lint_out = lint_report.model_dump_json(indent=2) + "\n"
+        lint_path = out_dir / f"{dxf_path.name}_lint.json"
+        lint_path.write_text(lint_out, encoding="utf-8")
+        record(lint_path, "dxf_lint", part.part_id)
 
     mesher = b.Mesher()
     for part in design.parts:
@@ -185,6 +194,8 @@ def export_design(
         "design": name,
         "files": files,
     }
+    if skipped:
+        manifest["skipped"] = skipped
     manifest_path = out_dir / "manifest.json"
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
