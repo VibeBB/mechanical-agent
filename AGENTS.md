@@ -92,6 +92,16 @@ docs/adr/  docs/research/
 - The `mech` MCP server exposes only deterministic entry points (the same
   functions `python -m mech` uses). It contains no agent logic.
 
+- MCP filesystem paths are confined to `OPENHANDS_PROJECT_DIR` by
+  `src/mech/workspace.py`; CLI paths remain unchanged.
+- `ensure_llm_profiles.py` and `safety_rail.py` are canonical across all nine
+  plugin repositories and checked by `scripts/check_shared_hooks.py`.
+  `_provenance.py` is shared where present; UX and Production Engineering
+  intentionally omit it. Mechanical's other hooks are
+  `intake_attachments.py`, `protect_generated.py`,
+  `record_vision_tool_event.py`, `record_image_observation.py`, and
+  `report_design_status.py`.
+
 ## Parallel execution
 
 - Accept parallelism through explicit `--jobs`-style arguments; default
@@ -136,8 +146,10 @@ uv run python scripts/verify_all.py --stage fast   # default before PR
 
 `verify_all.py` runs barrier-marked commands alone and consecutive
 non-barrier commands in parallel up to `--jobs` workers; `--list` dumps the
-machine-readable command table. pytest runs `-n auto --dist loadgroup`; use
-`uv run pytest -n 0` for single-test debugging.
+machine-readable command table. The fast stage runs pytest with `--cov` and
+`--cov-report=term-missing:skip-covered`; coverage measures `src/mech` with
+branches disabled and an 83% minimum. pytest runs `-n auto --dist loadgroup`;
+use `uv run pytest -n 0` for single-test debugging.
 
 ## Git
 

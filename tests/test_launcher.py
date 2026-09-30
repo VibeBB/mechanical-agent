@@ -5,9 +5,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -60,6 +61,14 @@ def test_docker_argv_transient_state_env() -> None:
     assert env["XDG_DATA_HOME"].startswith("/tmp/")
 
 
+def test_docker_argv_passes_project_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    module = _load_launcher()
+    argv = module._docker_argv(image="img", source=None, inner_argv=["doctor"])
+    env_pairs = [argv[i + 1] for i, arg in enumerate(argv) if arg == "-e"]
+    assert env_pairs.count(f"OPENHANDS_PROJECT_DIR={tmp_path}") == 1
+
+
 def test_docker_argv_does_not_forward_host_home(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -96,6 +105,43 @@ def test_ensure_image_warn_mode_never_pulls(
         pytest.skip("docker not on PATH")
     with pytest.raises(RuntimeError, match="not pulled locally"):
         module._ensure_image(tmp_path, pull=False)
+
+
+def test_inspect_timeout_fails_without_pulling(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MECH_TOOLS_IMAGE", "ghcr.io/x/mech-tools@sha256:abc")
+    module = _load_launcher()
+    monkeypatch.setattr(module, "_docker", lambda: "docker")
+    calls: list[tuple[list[str], int]] = []
+
+    def timed_out(argv: list[str], *, timeout: int, **_kwargs: object) -> SimpleNamespace:
+        calls.append((argv, timeout))
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    monkeypatch.setattr(module.subprocess, "run", timed_out)
+    with pytest.raises(RuntimeError, match="docker image inspect timed out after 30s"):
+        module._ensure_image(Path("."))
+    assert len(calls) == 1
+    assert calls[0][0][1:3] == ["image", "inspect"]
+    assert calls[0][1] == 30
+
+
+def test_pull_timeout_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MECH_TOOLS_IMAGE", "ghcr.io/x/mech-tools@sha256:abc")
+    module = _load_launcher()
+    monkeypatch.setattr(module, "_docker", lambda: "docker")
+    calls: list[tuple[list[str], int]] = []
+
+    def fake_run(argv: list[str], *, timeout: int, **_kwargs: object) -> SimpleNamespace:
+        calls.append((argv, timeout))
+        if argv[1:3] == ["image", "inspect"]:
+            return SimpleNamespace(returncode=1)
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="docker pull timed out after 900s"):
+        module._ensure_image(Path("."))
+    assert [call[1] for call in calls] == [30, 900]
+    assert calls[1][0][1] == "pull"
 
 
 def test_homes_includes_real_pw_dir() -> None:

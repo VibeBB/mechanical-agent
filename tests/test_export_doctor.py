@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
+
+import mech.export as export_module
 from mech.brief import DesignBrief
 from mech.doctor import run_doctor
 from mech.export import export_design
@@ -17,6 +20,7 @@ def test_export_manifest_complete(enclosure_brief: DesignBrief, tmp_path: Path):
     manifest = export_design(enclosure_brief, design, out_dir)
     kinds = {entry["kind"] for entry in manifest["files"]}
     assert {"step", "stl", "dxf", "3mf"} <= kinds
+    assert "skipped" not in manifest
     for entry in manifest["files"]:
         assert (out_dir / entry["path"]).exists()
 
@@ -106,6 +110,35 @@ def test_export_bracket(bracket_brief_dict: dict[str, Any], tmp_path: Path):
     design = generate(brief)
     manifest = export_design(brief, design, tmp_path / "out")
     assert manifest["files"]
+
+
+def test_export_records_skipped_dxf(
+    enclosure_brief: DesignBrief, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    design = generate(enclosure_brief)
+
+    def skip_outline(_shape: Any, z_mm: float) -> tuple[Any | None, str | None]:
+        return None, f"no XY-planar face at z={z_mm} mm"
+
+    monkeypatch.setattr(export_module, "_top_outline", skip_outline)
+    manifest = export_design(enclosure_brief, design, tmp_path / "out")
+
+    skipped = manifest["skipped"]
+    assert {entry["part_id"] for entry in skipped} == {part.part_id for part in design.parts}
+    assert all(entry["kind"] == "dxf" for entry in skipped)
+    assert all(entry["reason"].startswith("no XY-planar face at z=") for entry in skipped)
+    assert not any(entry["kind"] == "dxf" for entry in manifest["files"])
+
+
+def test_top_outline_reports_slice_failure() -> None:
+    class BrokenShape:
+        def __and__(self, _other: object) -> object:
+            raise RuntimeError("slice exploded")
+
+    assert export_module._top_outline(BrokenShape(), 1.0) == (  # pyright: ignore[reportPrivateUsage]
+        None,
+        "slice failed: RuntimeError: slice exploded",
+    )
 
 
 def test_doctor_reports_kernel():

@@ -18,6 +18,7 @@ dev = [
     "packaging>=26",
     "pyright>=1.1.414",
     "pytest>=9",
+    "pytest-cov==7.1.0",
     "pytest-xdist>=3",
     "ruff>=0.16",
 ]
@@ -48,7 +49,13 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-include = ["src", "scripts", "tests"]
+include = [
+    "src",
+    "scripts",
+    "tests",
+    "plugins/mech/hooks/scripts",
+    "plugins/mech/scripts",
+]
 exclude = ["**/__pycache__", ".venv"]
 
 [tool.pytest.ini_options]
@@ -56,3 +63,10 @@ testpaths = ["tests"]
 addopts = "-q -n auto --dist loadgroup"
 pythonpath = ["."]
 markers = ["slow: tests that build full CAD geometry"]
+
+[tool.coverage.run]
+source = ["src/mech"]
+branch = false
+
+[tool.coverage.report]
+fail_under = 83

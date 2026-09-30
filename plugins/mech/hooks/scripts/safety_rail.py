@@ -130,12 +130,8 @@ def _denied_git(args: list[str]) -> str | None:
         return "restoring paths with git checkout/restore -- is banned"
     if subcommand == "stash" and rest and rest[0] in ("drop", "clear"):
         return "git stash drop/clear is banned by the working agreement"
-    if subcommand == "add" and any(
-        operand == "." or flag in ("-A", "--all") for operand in operands for flag in [operand]
-    ):
-        return "git add . / -A is banned; add files individually"
-    if subcommand == "add" and any(flag in ("-A", "--all") for flag in flags):
-        return "git add -A/--all is banned; add files individually"
+    if subcommand == "add" and ("." in operands or any(f in ("-A", "--all") for f in flags)):
+        return "git add . / -A/--all is banned; add files individually"
     if subcommand == "commit" and any(flag in ("--amend", "--no-verify", "-n") for flag in flags):
         return "git commit --amend/--no-verify is banned by the working agreement"
     return None
@@ -203,7 +199,10 @@ def main() -> int:
     except (json.JSONDecodeError, OSError) as exc:
         print(f"invalid hook input: {exc}", file=sys.stderr)
         return 2
-    if not isinstance(payload, dict) or payload.get("tool_name") != "terminal":
+    if not isinstance(payload, dict):
+        return 0
+    payload = cast(dict[str, Any], payload)
+    if payload.get("tool_name") != "terminal":
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):

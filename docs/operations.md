@@ -8,16 +8,18 @@ table machine-readably).
 | Stage | Contents | When |
 | --- | --- | --- |
 | `docs` | `verify_docs.py` (markdown links + ADR index), `git diff --check` | Markdown-only changes |
-| `fast` | `uv sync --locked` (barrier), ruff check, ruff format, pyright, pytest, verify_docs, diff check | Before every PR |
+| `fast` | `uv sync --locked` (barrier), ruff check, ruff format, pyright, pytest with coverage, shared-hook check, verify_docs, diff check | Before every PR |
 
 ```bash
 uv run python scripts/verify_all.py --stage fast
 uv run python scripts/verify_all.py --stage docs --jobs 1   # sequential, streamed
 ```
 
-pytest runs `-n auto --dist loadgroup` by default; `-n 0` for single-test
-debugging. Keep collection counts, verdicts, and normalized hashes identical
-between parallel and sequential runs.
+The fast stage runs pytest with `--cov --cov-report=term-missing:skip-covered`;
+coverage measures `src/mech`, disables branch coverage, and enforces an 83%
+minimum. pytest runs `-n auto --dist loadgroup` by default; `-n 0` for
+single-test debugging. Keep collection counts, verdicts, and normalized hashes
+identical between parallel and sequential runs.
 
 ## Local end-to-end check
 
