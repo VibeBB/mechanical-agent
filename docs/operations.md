@@ -1,10 +1,11 @@
+# Operations runbook
+
 ## SBOM attestations
 
 `publish-mech-images.yml` generates and attests an SPDX-2.3 SBOM for the
 published tools digest and uploads it for 30 days. The lock records the
 returned `sbom_attestation` URL; `locked-image-check.yml` verifies it when
 present and warns while continuing when absent.
-# Operations runbook
 
 ## Verification stages
 

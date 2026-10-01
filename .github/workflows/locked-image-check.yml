@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           launcher=plugins/mech/scripts/mech_launcher.py
-          out=.round2-smoke/mech
+          out=.launcher-smoke/mech
           mkdir -p "$out"
           if python3 - <<'PY'
           import json
@@ -221,5 +221,5 @@ jobs:
         if: always()
         with:
           name: mech-locked-image-smoke
-          path: ${{ github.workspace }}/.round2-smoke/mech/
+          path: ${{ github.workspace }}/.launcher-smoke/mech/
           if-no-files-found: ignore
