@@ -20,18 +20,71 @@ jobs:
     timeout-minutes: 10
     outputs:
       present: ${{ steps.lock.outputs.present }}
+      attestation: ${{ steps.lock.outputs.attestation }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: lock
+        env:
+          EXPECTED_IMAGE: ghcr.io/vibebb/mech-tools
         run: |
-          if [ -s docker/image-digests.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("docker/image-digests.json")
+          try:
+              lock = json.loads(path.read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+              raise SystemExit(f"invalid image lock: {exc}") from exc
+          if not isinstance(lock, dict):
+              raise SystemExit("image lock must be a JSON object")
+          entry = lock.get("mech_tools")
+          if not isinstance(entry, dict):
+              raise SystemExit("image lock entry is missing or malformed: mech_tools")
+          if entry.get("image") != os.environ["EXPECTED_IMAGE"]:
+              raise SystemExit("image lock entry has an unexpected image: mech_tools")
+
+          digest = entry.get("digest")
+          tag = entry.get("tag")
+          attestation = entry.get("attestation")
+          if digest is None and tag is None:
+              if attestation is not None:
+                  raise SystemExit("unpublished image entry cannot have an attestation")
+              present = False
+              attestation = ""
+          else:
+              if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                  raise SystemExit("image lock digest must be sha256 followed by 64 lowercase hex digits")
+              if digest == f"sha256:{'0' * 64}":
+                  raise SystemExit("image lock digest cannot be a placeholder")
+              if not isinstance(tag, str) or not re.fullmatch(r"[0-9a-f]{40}-tools", tag):
+                  raise SystemExit("image lock tag has an invalid shape")
+              if attestation is not None and (
+                  not isinstance(attestation, str)
+                  or not attestation.startswith("https://")
+                  or "\n" in attestation
+              ):
+                  raise SystemExit("image lock attestation must be an HTTPS URL")
+              present = True
+              attestation = attestation or ""
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"present={str(present).lower()}\n")
+              output.write(f"attestation={attestation}\n")
+          PY
   check:
     needs: check-lock
     if: needs.check-lock.outputs.present == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    permissions:
+      attestations: read # verifies provenance for the locked tools image
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,13 +96,39 @@ jobs:
       - run: uv run python scripts/pull_locked_image.py --entry mech_tools
       - id: image
         run: echo "ref=$(uv run python scripts/print_locked_image.py --entry mech_tools)" >> "$GITHUB_OUTPUT"
+      - name: Verify tools image provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          ATTESTATION: ${{ needs.check-lock.outputs.attestation }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ATTESTATION" ]; then
+            echo "::warning::mech_tools lock has no provenance attestation; continuing"
+            exit 0
+          fi
+          image="${IMAGE_REF%@*}"
+          digest="${IMAGE_REF#*@}"
+          gh attestation verify "oci://${image}@${digest}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"
       # e2e_authoring exits non-zero unless the gate verdict is "pass"
       # (fail-closed), so the container exit code is the smoke check. The
-      # output dir stays inside the container's world-writable /tmp.
+      # smoke files are mounted from runner temp for failure artifacts.
       - name: Smoke locked image
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
         run: |
-          docker run --rm --user mech "$IMAGE_REF" \
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mech-smoke"
+          chmod 777 "$RUNNER_TEMP/mech-smoke"
+          docker run --rm --user mech \
+            --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$IMAGE_REF" \
             python /opt/mech/scripts/e2e_authoring.py \
               --brief /opt/mech/examples/enclosure.brief.json --out /tmp/mech-smoke/enclosure
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: mech-locked-image-smoke
+          path: ${{ runner.temp }}/mech-smoke/
+          if-no-files-found: ignore

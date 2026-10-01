@@ -34,20 +34,19 @@ jobs:
         run: |
           set -euo pipefail
           workdir="$RUNNER_TEMP/actionlint"
+          tarball="actionlint_1.7.12_linux_amd64.tar.gz"
           mkdir -p "$workdir"
-          cd "$workdir"
-          curl -fsSLO https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint_1.7.12_linux_amd64.tar.gz" | sha256sum -c -
-          tar -xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
-          cd "$GITHUB_WORKSPACE"
-          # The ubuntu-26.04 label is newer than actionlint's bundled runner
-          # list; only that specific finding is ignored.
-          "$workdir/actionlint" -oneline \
-            -ignore 'label "ubuntu-26\.04" is unknown' \
-            .github/workflows/*.yml
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 10 \
+            --output "$workdir/$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$tarball"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $workdir/$tarball" \
+            | sha256sum -c -
+          tar -xzf "$workdir/$tarball" -C "$workdir" actionlint
+          "$workdir/actionlint" -oneline
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
+          cache-suffix: workflow-lint
       - name: Zizmor
         env:
           # GH_TOKEN enables zizmor's online audits (advisory DB lookups,

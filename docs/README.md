@@ -19,3 +19,4 @@
 - [adr/ADR-0003-vision-l2.md](adr/ADR-0003-vision-l2.md) — vision as an L2 aid for intake and review only
 - [adr/ADR-0004-intake-attachment-materialization-and-evidence-binding.md](adr/ADR-0004-intake-attachment-materialization-and-evidence-binding.md) — intake attachment materialization and evidence binding
 - [adr/ADR-0005-vision-render-and-review-records.md](adr/ADR-0005-vision-render-and-review-records.md) — DXF→PNG render, visual baseline, typed visual-review records
+- [adr/ADR-0006-attest-published-tools-images.md](adr/ADR-0006-attest-published-tools-images.md) — attest published tools images and verify provenance for locked tools

@@ -41,6 +41,13 @@ def _load(path: Path) -> dict[str, Any]:
             if not isinstance(fields.get(field), str) or not fields[field]:
                 raise ValueError(f"image lock entry lacks {field}: {name}")
         _digest(cast(str, fields["digest"]))
+        attestation = fields.get("attestation")
+        if attestation is not None and (
+            not isinstance(attestation, str)
+            or not attestation.startswith("https://")
+            or "\n" in attestation
+        ):
+            raise ValueError(f"image lock attestation must be an HTTPS URL: {name}")
     return payload
 
 
@@ -55,6 +62,7 @@ def update_lock(
     workflow_run: str,
     dockerfile: str,
     tools: dict[str, str],
+    attestation: str | None = None,
 ) -> bool:
     if entry not in _ENTRIES:
         raise ValueError(f"unknown image lock entry: {entry}")
@@ -69,11 +77,13 @@ def update_lock(
         raise ValueError("published_at must be ISO-8601") from exc
     if not workflow_run or not dockerfile:
         raise ValueError("workflow_run and dockerfile must not be empty")
+    if attestation is not None and (not attestation.startswith("https://") or "\n" in attestation):
+        raise ValueError("attestation must be an HTTPS URL")
     if not tools or any(not key or not value for key, value in tools.items()):
         raise ValueError("tools must contain non-empty string values")
     payload = _load(path)
     before = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    payload[entry] = {
+    record: dict[str, Any] = {
         "digest": digest,
         "dockerfile": dockerfile,
         "image": image,
@@ -82,6 +92,9 @@ def update_lock(
         "tools": dict(sorted(tools.items())),
         "workflow_run": workflow_run,
     }
+    if attestation is not None:
+        record["attestation"] = attestation
+    payload[entry] = record
     after = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if before == after:
         return False
@@ -101,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workflow-run", required=True)
     parser.add_argument("--dockerfile", required=True)
     parser.add_argument("--tools-json", type=Path, required=True)
+    parser.add_argument("--attestation")
     args = parser.parse_args(argv)
     try:
         value: Any = json.loads(args.tools_json.read_text(encoding="utf-8"))
@@ -119,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             workflow_run=args.workflow_run,
             dockerfile=args.dockerfile,
             tools=cast(dict[str, str], value),
+            attestation=args.attestation,
         )
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL: {exc}")
