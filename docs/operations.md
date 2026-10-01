@@ -1,5 +1,12 @@
 # Operations runbook
 
+## SBOM attestations
+
+`publish-mech-images.yml` generates and attests an SPDX-2.3 SBOM for the
+published tools digest and uploads it for 30 days. The lock records the
+returned `sbom_attestation` URL; `locked-image-check.yml` verifies it when
+present and warns while continuing when absent.
+
 ## Verification stages
 
 The source of truth is `scripts/verify_all.py` (`--list` dumps the command
@@ -60,7 +67,8 @@ follow the shared `review-visual-<slug>.advisory.json` contract
 `publish-mech-images.yml` (main pushes under `docker/`, `src/`,
 `plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, changes to the
 publish workflow or lock scripts, or manual dispatch); the workflow opens a
-lock-update PR, runs CI on it, and merges.
+  lock-update PR, dispatches and waits for `ci.yml` and
+  `workflow-lint.yml` on the bot branch, and merges.
 Do not commit placeholder entries — `scripts/print_locked_image.py` rejects
 placeholder digests. The same `mech_tools` entry ships inside the plugin at
 `plugins/mech/skills/mech-workflow/tools-image.json` (rewritten by the same
@@ -86,9 +94,10 @@ In `--warn` doctor mode (the SessionStart hook) the launcher reports a
 missing local image instead of pulling it.
 
 `locked-image-check.yml` (weekly + post-publish) pulls the locked tools
-image, verifies available provenance, and re-runs `e2e_authoring` inside the
-container as the smoke check. Smoke output is mounted into runner temp and
-uploaded as an artifact even if the smoke step fails.
+image through `mech_launcher.py`, runs `doctor` and the shipped
+`e2e_authoring` example, and verifies available provenance and SBOM
+attestations. Smoke output is mounted into runner temp and uploaded as an
+artifact even if the smoke step fails.
 
 Local build and run instructions live in `docker/README.md`.
 
@@ -101,7 +110,8 @@ Local build and run instructions live in `docker/README.md`.
   manual dispatch, and weekly; uploads SARIF.
 - `check-dependency-updates.yml` — weekly + manual; writes its report under
   runner temp, appends the run URL to the report and step summary, and posts
-  candidates to the "Dependency update check report" issue.
+  candidates to the "Dependency update check report" issue. Fetch failures
+  are reported as unknown and keep the issue open.
 - `digest-lock-sweep.yml` — periodically retries merging eligible digest-lock
   PRs while required checks remain enforced.
 - `publish-mech-images.yml` — builds and publishes the GHCR images, attests
@@ -222,3 +232,18 @@ Runtime policy surfaces that the plugin declares but the host executes:
   hand-edit artifacts (the `protect-generated` hook blocks that anyway).
 - MCP `isError` results carry `fail_closed: true` + a reason; fix the input
   and retry rather than bypassing the tool.
+
+## Launcher-side verification
+
+`MECH_VERIFY_ATTESTATION` accepts `auto` (the default), `require`, or `off`.
+Before pulling a lock-provided image, and on every `prewarm`, the launcher
+uses `gh attestation verify` with the lock entry and publisher workflow.
+`auto` prints one note and skips for an image override, missing attestation,
+missing `gh`, or failed `gh auth status`; once verification starts, failure
+or timeout prevents the pull. `require` makes skip conditions errors, while
+`off` never verifies. Ordinary invocations do not re-verify a locally
+present image, and `--warn` doctor paths never verify.
+
+## CI runner network auditing
+
+CI and image-publishing jobs use `step-security/harden-runner` in audit-only mode. It observes network egress without blocking requests; per-run insights are available in the GitHub Actions job summary.

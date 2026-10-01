@@ -9,9 +9,25 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _ENTRIES = {"mech_tools", "mech_server"}
+
+
+def _is_https_url(value: str) -> bool:
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and hostname is not None
+        and not any(char.isspace() for char in parsed.netloc)
+        and "\r" not in value
+        and "\n" not in value
+    )
 
 
 def _digest(value: str) -> str:
@@ -41,13 +57,10 @@ def _load(path: Path) -> dict[str, Any]:
             if not isinstance(fields.get(field), str) or not fields[field]:
                 raise ValueError(f"image lock entry lacks {field}: {name}")
         _digest(cast(str, fields["digest"]))
-        attestation = fields.get("attestation")
-        if attestation is not None and (
-            not isinstance(attestation, str)
-            or not attestation.startswith("https://")
-            or "\n" in attestation
-        ):
-            raise ValueError(f"image lock attestation must be an HTTPS URL: {name}")
+        for field in ("attestation", "sbom_attestation"):
+            url = fields.get(field)
+            if url is not None and (not isinstance(url, str) or not _is_https_url(url)):
+                raise ValueError(f"image lock {field} must be an HTTPS URL: {name}")
     return payload
 
 
@@ -63,6 +76,7 @@ def update_lock(
     dockerfile: str,
     tools: dict[str, str],
     attestation: str | None = None,
+    sbom_attestation: str | None = None,
 ) -> bool:
     if entry not in _ENTRIES:
         raise ValueError(f"unknown image lock entry: {entry}")
@@ -77,8 +91,10 @@ def update_lock(
         raise ValueError("published_at must be ISO-8601") from exc
     if not workflow_run or not dockerfile:
         raise ValueError("workflow_run and dockerfile must not be empty")
-    if attestation is not None and (not attestation.startswith("https://") or "\n" in attestation):
+    if attestation is not None and not _is_https_url(attestation):
         raise ValueError("attestation must be an HTTPS URL")
+    if sbom_attestation is not None and not _is_https_url(sbom_attestation):
+        raise ValueError("sbom_attestation must be an HTTPS URL")
     if not tools or any(not key or not value for key, value in tools.items()):
         raise ValueError("tools must contain non-empty string values")
     payload = _load(path)
@@ -94,6 +110,8 @@ def update_lock(
     }
     if attestation is not None:
         record["attestation"] = attestation
+    if sbom_attestation is not None:
+        record["sbom_attestation"] = sbom_attestation
     payload[entry] = record
     after = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if before == after:
@@ -115,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dockerfile", required=True)
     parser.add_argument("--tools-json", type=Path, required=True)
     parser.add_argument("--attestation")
+    parser.add_argument("--sbom-attestation")
     args = parser.parse_args(argv)
     try:
         value: Any = json.loads(args.tools_json.read_text(encoding="utf-8"))
@@ -134,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
             dockerfile=args.dockerfile,
             tools=cast(dict[str, str], value),
             attestation=args.attestation,
+            sbom_attestation=args.sbom_attestation,
         )
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
         print(f"FAIL: {exc}")

@@ -158,3 +158,5 @@ Write commit messages in English. Do not use `git add .`, amend commits,
 `clean -fd`, `checkout -- file`, or `stash drop`. Do not commit generated
 `out/` files, secrets, or environment files. Split dependent changes into
 bottom-up stacked PRs; independent changes go on separate PRs based on main.
+
+Shared workflows are canonical across the family; change all 11 copies together and update `EXPECTED` in `scripts/check_shared_workflows.py`.

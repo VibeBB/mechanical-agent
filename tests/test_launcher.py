@@ -90,7 +90,12 @@ def test_image_from_lock_reads_skill_pin(tmp_path: Path) -> None:
         "attestation": "https://github.com/example/attestations/1",
     }
     (skill_dir / "tools-image.json").write_text(json.dumps(entry), encoding="utf-8")
-    assert module._image_from_lock(tmp_path) == "ghcr.io/x/mech-tools@sha256:abc"
+    assert module._image_from_lock(tmp_path) == {
+        "ref": "ghcr.io/x/mech-tools@sha256:abc",
+        "image": "ghcr.io/x/mech-tools",
+        "digest": "sha256:abc",
+        "attestation": "https://github.com/example/attestations/1",
+    }
 
 
 def test_ensure_image_warn_mode_never_pulls(
@@ -123,7 +128,7 @@ def test_inspect_timeout_fails_without_pulling(monkeypatch: pytest.MonkeyPatch) 
         raise subprocess.TimeoutExpired(argv, timeout)
 
     monkeypatch.setattr(module.subprocess, "run", timed_out)
-    with pytest.raises(RuntimeError, match="docker image inspect timed out after 30s"):
+    with pytest.raises(RuntimeError, match="docker image inspect timed out after 30 seconds"):
         module._ensure_image(Path("."))
     assert len(calls) == 1
     assert calls[0][0][1:3] == ["image", "inspect"]
@@ -143,7 +148,7 @@ def test_pull_timeout_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
         raise subprocess.TimeoutExpired(argv, timeout)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    with pytest.raises(RuntimeError, match="docker pull timed out after 900s"):
+    with pytest.raises(RuntimeError, match="docker pull timed out after 900 seconds"):
         module._ensure_image(Path("."))
     assert [call[1] for call in calls] == [30, 900]
     assert calls[1][0][1] == "pull"
