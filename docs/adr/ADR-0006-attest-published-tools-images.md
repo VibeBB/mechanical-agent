@@ -1,3 +1,10 @@
+## SBOM attestations
+
+The publisher generates an SPDX-2.3 SBOM for the digest-pinned tools image,
+attests it with predicate type `https://spdx.dev/Document/v2.3`, and uploads
+the artifact for 30 days. The returned URL is stored as `sbom_attestation`;
+locked-image checks verify it when present and warn when absent. Unpinned
+locks cannot carry this metadata.
 # ADR-0006: Attest published tools images
 
 Status: Accepted
@@ -23,3 +30,14 @@ tools-image attestation flow.
 New tools-image pins carry a provenance reference that the smoke workflow can
 verify. The workflow requires OIDC and attestation-write permissions to
 publish the statement, and attestation-read permission to verify it.
+
+## Launcher-side verification
+
+`MECH_VERIFY_ATTESTATION` accepts `auto` (the default), `require`, or `off`.
+Before pulling a lock-provided image, and on every `prewarm`, the launcher
+uses `gh attestation verify` with the lock entry and publisher workflow.
+`auto` prints one note and skips for an image override, missing attestation,
+missing `gh`, or failed `gh auth status`; once verification starts, failure
+or timeout prevents the pull. `require` makes skip conditions errors, while
+`off` never verifies. Ordinary invocations do not re-verify a locally
+present image, and `--warn` doctor paths never verify.

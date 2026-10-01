@@ -22,27 +22,25 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # Uploads the SARIF report to code scanning.
+      # Uploads the zizmor SARIF report to code scanning.
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # actionlint catches YAML structural errors (e.g. duplicate keys) that
-      # produce a zero-jobs run with no logs; zizmor does not check them.
-      - name: Actionlint
+      - name: actionlint
         run: |
           set -euo pipefail
-          workdir="$RUNNER_TEMP/actionlint"
+          # The sha256 is the published value from
+          # actionlint_1.7.12_checksums.txt on the v1.7.12 release.
           tarball="actionlint_1.7.12_linux_amd64.tar.gz"
-          mkdir -p "$workdir"
           curl --fail --location --silent --show-error --retry 5 --retry-delay 10 \
-            --output "$workdir/$tarball" \
+            --output "$RUNNER_TEMP/$tarball" \
             "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$tarball"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $workdir/$tarball" \
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/$tarball" \
             | sha256sum -c -
-          tar -xzf "$workdir/$tarball" -C "$workdir" actionlint
-          "$workdir/actionlint" -oneline
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -oneline
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"

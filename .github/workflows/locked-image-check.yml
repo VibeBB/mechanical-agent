@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  attestations: read
 
 concurrency:
   group: locked-image-check
@@ -21,6 +22,7 @@ jobs:
     outputs:
       present: ${{ steps.lock.outputs.present }}
       attestation: ${{ steps.lock.outputs.attestation }}
+      sbom_attestation: ${{ steps.sbom.outputs.sbom_attestation }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,6 +79,42 @@ jobs:
               output.write(f"present={str(present).lower()}\n")
               output.write(f"attestation={attestation}\n")
           PY
+      - id: sbom
+        env:
+          LOCK_PATH: docker/image-digests.json
+          LOCK_ENTRY: mech_tools
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import urlsplit
+
+          path = Path(os.environ["LOCK_PATH"])
+          entry = None
+          if path.is_file():
+              data = json.loads(path.read_text(encoding="utf-8"))
+              if not isinstance(data, dict):
+                  raise SystemExit("image digest lock must be a JSON object")
+              entry = data.get(os.environ["LOCK_ENTRY"])
+          if entry is not None and not isinstance(entry, dict):
+              raise SystemExit("image lock entry must be an object")
+          sbom_attestation = entry.get("sbom_attestation") if entry else None
+          if entry and entry.get("digest") is None and entry.get("tag") is None:
+              if sbom_attestation is not None:
+                  raise SystemExit("unpublished image entry cannot have an SBOM attestation")
+              sbom_attestation = ""
+          elif sbom_attestation is not None:
+              parsed = urlsplit(sbom_attestation) if isinstance(sbom_attestation, str) else None
+              if (
+                  parsed is None
+                  or parsed.scheme != "https"
+                  or not parsed.netloc
+                  or any(character.isspace() for character in sbom_attestation)
+              ):
+                  raise SystemExit("image lock SBOM attestation must be an HTTPS URL")
+          print(f"sbom_attestation={sbom_attestation or ''}")
+          PY
   check:
     needs: check-lock
     if: needs.check-lock.outputs.present == 'true'
@@ -112,23 +150,76 @@ jobs:
           gh attestation verify "oci://${image}@${digest}" \
             --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"
+      - name: Warn when tools image has no SBOM attestation
+        if: needs.check-lock.outputs.sbom_attestation == ''
+        run: echo "::warning::mech_tools image lock has no SBOM attestation; continuing"
+      - name: Verify tools image SBOM attestation
+        if: needs.check-lock.outputs.sbom_attestation != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          image="${IMAGE_REF%@*}"
+          digest="${IMAGE_REF#*@}"
+          gh attestation verify "oci://${image}@${digest}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml" \
+            --predicate-type https://spdx.dev/Document/v2.3
       # e2e_authoring exits non-zero unless the gate verdict is "pass"
       # (fail-closed), so the container exit code is the smoke check. The
       # smoke files are mounted from runner temp for failure artifacts.
       - name: Smoke locked image
         env:
-          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          GH_TOKEN: ${{ github.token }}
+          OPENHANDS_PROJECT_DIR: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/mech-smoke"
-          chmod 777 "$RUNNER_TEMP/mech-smoke"
-          docker run --rm --user mech \
-            --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$IMAGE_REF" \
-            python /opt/mech/scripts/e2e_authoring.py \
-              --brief /opt/mech/examples/enclosure.brief.json --out /tmp/mech-smoke/enclosure
+          launcher=plugins/mech/scripts/mech_launcher.py
+          out=.round2-smoke/mech
+          mkdir -p "$out"
+          if python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          entry = json.loads(Path("docker/image-digests.json").read_text(encoding="utf-8"))["mech_tools"]
+          raise SystemExit(0 if entry.get("attestation") else 1)
+          PY
+          then
+            export MECH_VERIFY_ATTESTATION=require
+          else
+            export MECH_VERIFY_ATTESTATION=auto
+          fi
+          python3 "$launcher" prewarm
+          python3 "$launcher" doctor > "$out/doctor.json"
+          set +e
+          python3 "$launcher" author --brief examples/enclosure.brief.json \
+            --out "$out/enclosure" > "$out/author.stdout.json"
+          status=$?
+          set -e
+          python3 - "$out/enclosure" "$out/author.stdout.json" "$status" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1])
+          stdout = Path(sys.argv[2])
+          status = int(sys.argv[3])
+          reports = sorted(output.rglob("*report.json"))
+          printed = False
+          for report_path in reports:
+              report = json.loads(report_path.read_text(encoding="utf-8"))
+              if isinstance(report, dict) and "checks" in report:
+                  print(json.dumps(report["checks"], ensure_ascii=False, indent=2))
+                  printed = True
+          if not printed:
+              print(stdout.read_text(encoding="utf-8"))
+          result = json.loads(stdout.read_text(encoding="utf-8"))
+          if status != 0 or result.get("verdict") != "pass":
+              raise SystemExit("mechanical launcher smoke did not pass")
+          PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: mech-locked-image-smoke
-          path: ${{ runner.temp }}/mech-smoke/
+          path: ${{ github.workspace }}/.round2-smoke/mech/
           if-no-files-found: ignore
