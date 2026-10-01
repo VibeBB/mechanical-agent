@@ -58,8 +58,9 @@ follow the shared `review-visual-<slug>.advisory.json` contract
 
 `docker/image-digests.json` is the digest lock. It is written only by
 `publish-mech-images.yml` (main pushes under `docker/`, `src/`,
-`plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, or manual
-dispatch); the workflow opens a lock-update PR, runs CI on it, and merges.
+`plugins/mech/`, `examples/`, `pyproject.toml`/`uv.lock`, changes to the
+publish workflow or lock scripts, or manual dispatch); the workflow opens a
+lock-update PR, runs CI on it, and merges.
 Do not commit placeholder entries — `scripts/print_locked_image.py` rejects
 placeholder digests. The same `mech_tools` entry ships inside the plugin at
 `plugins/mech/skills/mech-workflow/tools-image.json` (rewritten by the same
@@ -67,6 +68,13 @@ workflow) so an installed plugin resolves the pinned tools image without the
 extension cache — `mech_launcher.py` checks `<plugin>/tools-image.json`,
 then `<plugin>/skills/*/tools-image.json`, then
 `docker/image-digests.json`.
+
+The `mech_tools` image build publishes a GitHub build-provenance attestation;
+its URL is stored alongside the digest in both tools lock files. The locked
+image check verifies available provenance against
+`.github/workflows/publish-mech-images.yml`. Older pins without an attestation
+emit a warning and continue. The `mech_server` digest is separate and is not
+covered by this tools-image provenance check (ADR-0006).
 
 The tools container runs as the host uid, whose home does not exist inside
 the image: the launcher pins `HOME`/`TMPDIR`/`XDG_*` to `/tmp` instead of
@@ -78,7 +86,9 @@ In `--warn` doctor mode (the SessionStart hook) the launcher reports a
 missing local image instead of pulling it.
 
 `locked-image-check.yml` (weekly + post-publish) pulls the locked tools
-image and re-runs `e2e_authoring` inside the container as the smoke check.
+image, verifies available provenance, and re-runs `e2e_authoring` inside the
+container as the smoke check. Smoke output is mounted into runner temp and
+uploaded as an artifact even if the smoke step fails.
 
 Local build and run instructions live in `docker/README.md`.
 
@@ -87,14 +97,22 @@ Local build and run instructions live in `docker/README.md`.
 - `ci.yml` — `verify` (matrix 3.12/3.13: sync, ruff, format, pyright,
   pytest, docs) + `plugin-load` (loads `plugins/mech` via
   `openhands-sdk` `Plugin.load` through `scripts/check_plugin_load.py`).
-- `workflow-lint.yml` — zizmor on PRs, `.github/**` pushes, merge groups,
-  and weekly; uploads SARIF.
-- `check-dependency-updates.yml` — weekly + manual; posts candidates to the
-  "Dependency update check report" issue.
-- `publish-mech-images.yml` — builds and publishes the GHCR images and
-  updates the digest lock via a self-merging PR (see "Container images").
+- `workflow-lint.yml` — actionlint and zizmor on PRs, `.github/**` pushes,
+  manual dispatch, and weekly; uploads SARIF.
+- `check-dependency-updates.yml` — weekly + manual; writes its report under
+  runner temp, appends the run URL to the report and step summary, and posts
+  candidates to the "Dependency update check report" issue.
+- `digest-lock-sweep.yml` — periodically retries merging eligible digest-lock
+  PRs while required checks remain enforced.
+- `publish-mech-images.yml` — builds and publishes the GHCR images, attests
+  the tools image, and updates the digest lock via a self-merging PR (see
+  "Container images").
 - `locked-image-check.yml` — weekly + post-publish smoke of the locked
   image (see "Container images").
+- `main-ci-failure-issue.yml` — watches completed main runs from CI,
+  dependency updates, digest sweeps, locked-image checks, PR cleanup,
+  publishing, releases, and workflow lint; maintains a tracking issue.
+- `pr-branch-cleanup.yml` — removes merged PR branches.
 - `release.yml` — manual dispatch only (see below).
 
 Every `uses:` is pinned to a 40-char SHA with a `# vX.Y.Z` comment;

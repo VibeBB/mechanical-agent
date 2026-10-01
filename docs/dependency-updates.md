@@ -50,10 +50,12 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | --- | --- |
 | actions/checkout | v7.0.1 |
 | astral-sh/setup-uv | v10.2.0 |
-| github/codeql-action/upload-sarif | v4.38.1 |
+| github/codeql-action/upload-sarif | v4.38.2 |
 | docker/setup-buildx-action | v4.4.1 |
 | docker/login-action | v4.6.0 |
 | docker/build-push-action | v7.4.0 |
+| actions/upload-artifact | v7.0.1 |
+| actions/attest-build-provenance | v4.2.2 |
 
 ## Docker image pins
 

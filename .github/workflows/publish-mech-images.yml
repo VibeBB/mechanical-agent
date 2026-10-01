@@ -16,6 +16,7 @@ on:
       - "scripts/print_locked_image.py"
       - "scripts/pull_locked_image.py"
       - "scripts/update_image_digest_lock.py"
+      - ".github/workflows/publish-mech-images.yml"
       - "!docker/image-digests.json"
       # The plugin pin is written by this workflow itself; exclude it so a
       # merged pin PR does not trigger another publish.
@@ -45,6 +46,8 @@ jobs:
     # ghcr.io images; pull-requests opens and merges the digest-lock PR.
     permissions:
       actions: write
+      id-token: write # OIDC for build-provenance attestation
+      attestations: write # stores the attestation
       contents: write
       packages: write
       pull-requests: write
@@ -93,6 +96,14 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Attest tools image provenance
+        id: attest
+        if: inputs.skip_tools != true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/vibebb/mech-tools
+          subject-digest: ${{ steps.tools.outputs.digest }}
+          push-to-registry: true
       - name: Resolve tools digest
         env:
           BUILT_DIGEST: ${{ steps.tools.outputs.digest }}
@@ -114,16 +125,25 @@ jobs:
         run: uv run python scripts/measure_image_tools.py --image-ref "$TOOLS_REF" --out "$RUNNER_TEMP/mech-tools.json"
       # e2e_authoring exits non-zero unless the gate verdict is "pass"
       # (fail-closed), so the container exit code is the smoke check. The
-      # output dir stays inside the container's world-writable /tmp.
+      # mounted output is uploaded even when the smoke fails.
       - name: Verify published tools smoke
         env:
           TOOLS_REF: ${{ env.TOOLS_REF }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mech-smoke"
+          chmod 777 "$RUNNER_TEMP/mech-smoke"
           docker pull "$TOOLS_REF"
-          docker run --rm --user mech "$TOOLS_REF" \
+          docker run --rm --user mech \
+            --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$TOOLS_REF" \
             python /opt/mech/scripts/e2e_authoring.py \
               --brief /opt/mech/examples/enclosure.brief.json --out /tmp/mech-smoke/enclosure
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: mech-published-image-smoke
+          path: ${{ runner.temp }}/mech-smoke/
+          if-no-files-found: ignore
       - name: Clone OpenHands SDK
         run: git clone --depth 1 --branch "v${SDK_VERSION}" https://github.com/OpenHands/software-agent-sdk "$RUNNER_TEMP/sdk"
       - name: Stabilize server build cache tag
@@ -193,6 +213,7 @@ jobs:
       - name: Update digest lock and merge PR
         env:
           GH_TOKEN: ${{ github.token }}
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
           SKIP_TOOLS: ${{ inputs.skip_tools }}
         run: |
           set -euo pipefail
@@ -266,7 +287,8 @@ jobs:
               --entry mech_tools --image "ghcr.io/${IMAGE_OWNER}/mech-tools" \
               --tag "$TOOLS_TAG" --digest "$TOOLS_DIGEST" --published-at "$published_at" \
               --workflow-run "$workflow_run" --dockerfile docker/mech-tools.Dockerfile \
-              --tools-json "$RUNNER_TEMP/mech-tools.json"
+              --tools-json "$RUNNER_TEMP/mech-tools.json" \
+              --attestation "$ATTESTATION_URL"
           fi
           uv run python scripts/update_image_digest_lock.py --lock docker/image-digests.json \
             --entry mech_server --image "ghcr.io/${IMAGE_OWNER}/mech-server" \
