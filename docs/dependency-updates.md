@@ -12,8 +12,8 @@ the adoption decision for each. Update it in the same change that touches
 | ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.50.0` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.50.0` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.50.1` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.50.1` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
