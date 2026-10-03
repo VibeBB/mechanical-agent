@@ -51,6 +51,7 @@ jobs:
       id-token: write # OIDC for build-provenance attestation
       attestations: write # stores the attestation
       artifact-metadata: write # creates the attestation storage record
+      security-events: write # uploads the Trivy SARIF scans to code scanning
       contents: write
       packages: write
       pull-requests: write
@@ -102,6 +103,49 @@ jobs:
             ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Scan tools image (Trivy SARIF)
+        if: inputs.skip_tools != true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          # Scan the exact pushed digest — the content the SBOM and
+          # provenance attestations bind to.
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          format: sarif
+          output: trivy-mech-tools.sarif
+          limit-severities-for-sarif: true
+      - name: Scan tools image (Trivy JSON)
+        if: inputs.skip_tools != true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: false
+          include-non-failures: true
+          exit-code: '0'
+          format: json
+          output: trivy-mech-tools-report.json
+          skip-setup-trivy: true
+      - name: Upload tools Trivy SARIF
+        if: always() && inputs.skip_tools != true
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-mech-tools.sarif
+          category: trivy-mech-tools
+      - name: Upload tools Trivy JSON report
+        if: always() && inputs.skip_tools != true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mech-tools-trivy
+          path: trivy-mech-tools-report.json
+          retention-days: 90
       - name: Attest tools image provenance
         id: attest
         if: inputs.skip_tools != true
@@ -254,6 +298,45 @@ jobs:
           printf 'SERVER_TAG=%s\nSERVER_DIGEST=%s\n' "$SERVER_TAG" "$SERVER_DIGEST" >> "$GITHUB_ENV"
           docker buildx imagetools create --tag "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
             "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}"
+      - name: Scan server image (Trivy SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          format: sarif
+          output: trivy-mech-server.sarif
+          limit-severities-for-sarif: true
+      - name: Scan server image (Trivy JSON)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: false
+          include-non-failures: true
+          exit-code: '0'
+          format: json
+          output: trivy-mech-server-report.json
+          skip-setup-trivy: true
+      - name: Upload server Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy-mech-server.sarif
+          category: trivy-mech-server
+      - name: Upload server Trivy JSON report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mech-server-trivy
+          path: trivy-mech-server-report.json
+          retention-days: 90
       - name: Measure published server
         run: |
           set -euo pipefail
