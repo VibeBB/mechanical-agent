@@ -384,11 +384,11 @@ jobs:
           set -euo pipefail
           if [ "$SKIP_TOOLS" != true ]; then
             docker buildx imagetools create \
-              "ghcr.io/${IMAGE_OWNER}/mech-tools:latest" \
+              --tag "ghcr.io/${IMAGE_OWNER}/mech-tools:latest" \
               "$TOOLS_REF"
           fi
           docker buildx imagetools create \
-            "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
+            --tag "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
             "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
       - name: Update digest lock and merge PR
         env:
