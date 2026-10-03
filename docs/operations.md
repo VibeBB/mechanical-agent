@@ -302,6 +302,38 @@ msgpack, setuptools — never invoked; dependencies install via `uv` and
 the shipped venv is pip-less) is stripped in the `uv python install`
 layer, so the publish gate stays clean without `.trivyignore` waivers.
 
+The pinned `debian:13-slim` base digest keeps shipping `libpcre2-8-0`
+`10.46-1~deb13u2`; the tools Dockerfile upgrades it in-build to the
+fixed `deb13u3` (CVE-2026-103111) via `apt-get install --only-upgrade`,
+keeping the publish gate green between base-digest bumps without a
+waiver. The same fix propagates to `mech-server`, which the SDK build
+layers on top of the tools image.
+
+`mech-server` findings (enumerated from a 2026-10-03 scan of
+`ghcr.io/vibebb/mech-server@sha256:8129ed13...` — the image had never
+been scanned because earlier publishes aborted at the tools gate) are
+upstream-borne and waived per-ID in `.trivyignore` with
+`exp:2027-01-03`: SDK `.venv` packages (pypdf, urllib3, virtualenv,
+wheel, setuptools, msgpack, jaraco.context), nodejs_wheel vendored
+node_modules, bundled Go binaries (rootlesskit, docker-buildx), and
+upstream Dockerfile copies (DS-0029). They clear on the next
+openhands-sdk bump — tracked in `scripts/dependency_update_deferrals.json`.
+
+The weekly audit runs Lynis as container root (`--user 0`) with the
+committed `docker/lynis-container.prf` profile, which skips tests that
+are inapplicable inside a container (kernel/systemd/mounts/storage/
+network/PAM/accounting are governed by the runtime flags below, not the
+image fs). The profile raises the measured Hardening Index from ~62 to
+~68 and reduces the suggestion list to image-actionable items;
+remaining suggestions are fixed in the Dockerfile (`UMASK 027` in
+login.defs, Lynis AUTH-9328) or silenced only with a documented reason.
+
+`mech_launcher.py` applies the runtime-hardening flags the container
+profile defers to: `--network none`, `--user uid:gid`,
+`--cap-drop ALL`, `--security-opt no-new-privileges`. A `--read-only`
+root filesystem stays an optional hardening for callers that supply
+tmpfs for tools that need scratch space.
+
 ## CI runner network auditing
 
 CI and image-publishing jobs use `step-security/harden-runner` in audit-only mode. It observes network egress without blocking requests; per-run insights are available in the GitHub Actions job summary.

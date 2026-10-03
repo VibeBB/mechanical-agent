@@ -43,6 +43,11 @@ RUN apt-get -o Acquire::Retries=5 update \
         libfreetype6 \
         libfontconfig1 \
         librsvg2-bin \
+    # The pinned base digest keeps shipping libpcre2-8-0 10.46-1~deb13u2;
+    # upgrade it in-build to the fixed deb13u3 (CVE-2026-103111) so the
+    # publish-time Trivy gate stays green between base-digest bumps.
+    && apt-get -o Acquire::Retries=5 install --no-install-recommends \
+        --only-upgrade -y libpcre2-8-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # The uv-managed CPython bundles pip with vendored copies of urllib3,
@@ -74,6 +79,10 @@ RUN uv export --frozen --no-dev --no-emit-project --format requirements-txt \
     && python -m mech doctor \
     && rsvg-convert --version \
     && rm -f /tmp/mech-requirements.txt
+
+# Tighten the login.defs umask to 027 (Lynis AUTH-9328): the image has no
+# interactive users, so files created at runtime stay group-readable only.
+RUN printf 'UMASK 027\n' >> /etc/login.defs
 
 RUN if ! getent group mech >/dev/null; then groupadd mech; fi \
     && if getent passwd 1000 >/dev/null; then \
