@@ -66,6 +66,19 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | Python in image | `3.12` | `uv python install` inside the Dockerfile |
 | librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
 
+## Workflow git clone pins
+
+| Item | Pin | Where |
+| --- | --- | --- |
+| CISOfy/lynis | `3.1.7` | `git clone --depth 1 --branch` in `container-audit.yml` |
+
+The checker treats `git clone --branch <ref>` pins inside workflows as a
+`git-clone` surface and compares the ref against the upstream repo's
+highest semver tag, so a new Lynis release surfaces in the weekly report.
+Refs resolved at run time are skipped: `publish-mech-images.yml` clones
+`OpenHands/software-agent-sdk` at `v${SDK_VERSION}` (derived from the
+pyproject pin), which the `pypi` surface already tracks.
+
 ## Checked by `scripts/check_dependency_updates.py`
 
 The checker renders a per-surface markdown report (plus optional JSON) with
@@ -94,6 +107,8 @@ state columns `update available` / `deferred` / `up to date`. Surfaces:
   `mech_render` rasterizer). Apt versions track the Debian archive, so the
   surface reports presence, not upgrades: a package absent from the
   Dockerfile is flagged instead.
+- `git-clone` — workflow `git clone --branch` pins (e.g. CISOfy/lynis in
+  `container-audit.yml`) against the upstream repo's latest semver tag.
 
 The weekly workflow posts the markdown report to the "Dependency update
 check report" issue. Deferred candidates are recorded in
