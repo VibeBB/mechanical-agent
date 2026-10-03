@@ -12,8 +12,8 @@ the adoption decision for each. Update it in the same change that touches
 | ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.50.1` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.50.1` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.51.0` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.51.0` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
@@ -38,7 +38,7 @@ the adoption decision for each. Update it in the same change that touches
 
 | Tool | Pin | Where |
 | --- | --- | --- |
-| uv | `==0.12.21` | `[tool.uv] required-version` |
+| uv | `==0.12.22` | `[tool.uv] required-version` |
 | Python | `>=3.12`, CI matrix 3.12/3.13 | pyproject `requires-python` |
 | zizmor | `1.30.1` (uvx pin) | `workflow-lint.yml` |
 
@@ -62,7 +62,7 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | Item | Pin | Where |
 | --- | --- | --- |
 | debian base image | `13-slim` | `docker/mech-tools.Dockerfile` `FROM` |
-| uv | `0.12.21` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
+| uv | `0.12.22` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
 | Python in image | `3.12` | `uv python install` inside the Dockerfile |
 | librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
 
@@ -133,7 +133,7 @@ only while `review_by` has not passed and still matches the reported
 
 | Surface | Name | Latest | Re-check | Reason |
 | --- | --- | --- | --- | --- |
-| pypi | mcp | 2.2.0 | 2027-01-01 | `openhands-sdk` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
+| pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.51.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
 | python-version | * | 3.14 | 2027-04-01 | Matrix is 3.12/3.13; SDK support and build123d/OCP wheels for 3.14 unconfirmed. |
 
 ## Not covered
