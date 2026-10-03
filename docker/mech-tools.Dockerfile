@@ -8,6 +8,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG UV_VERSION=0.12.21
 ARG IMAGE_REVISION=unknown
 
+# Fail the build when the left side of a verification/detection pipe
+# (e.g. getent|cut) breaks instead of silently passing the right side.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
 ENV PATH="/opt/mech/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -50,8 +54,9 @@ COPY plugins/mech /opt/mech/plugins/mech
 COPY scripts/e2e_authoring.py /opt/mech/scripts/e2e_authoring.py
 COPY examples /opt/mech/examples
 
-RUN cd /opt/mech \
-    && uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+WORKDIR /opt/mech
+
+RUN uv export --frozen --no-dev --no-emit-project --format requirements-txt \
         --output-file /tmp/mech-requirements.txt \
     && uv pip install --python /opt/mech/.venv/bin/python \
         --requirement /tmp/mech-requirements.txt \
@@ -71,5 +76,3 @@ RUN if ! getent group mech >/dev/null; then groupadd mech; fi \
        fi \
     && mkdir -p /home/mech/.cache \
     && chown -R mech:mech /home/mech
-
-WORKDIR /opt/mech

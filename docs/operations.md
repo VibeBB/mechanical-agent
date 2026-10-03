@@ -107,7 +107,8 @@ Local build and run instructions live in `docker/README.md`.
 ## CI
 
 - `ci.yml` — `verify` (matrix 3.12/3.13: sync, ruff, format, pyright,
-  pytest, docs) + `plugin-load` (loads `plugins/mech` via
+  pytest, docs) + `dockerfile-lint` (hadolint + BuildKit `--check` on
+  `docker/mech-tools.Dockerfile`) + `plugin-load` (loads `plugins/mech` via
   `openhands-sdk` `Plugin.load` through `scripts/check_plugin_load.py`).
 - `workflow-lint.yml` — actionlint and zizmor on PRs, `.github/**` pushes,
   manual dispatch, and weekly; uploads SARIF.
@@ -122,6 +123,9 @@ Local build and run instructions live in `docker/README.md`.
   "Container images").
 - `locked-image-check.yml` — weekly + post-publish smoke of the locked
   image (see "Container images").
+- `container-audit.yml` — weekly Trivy re-scan of the locked tools image
+  plus Docker CIS and informational Lynis reports; maintains the
+  "Container hardening report" issue (see "Container hardening").
 - `main-ci-failure-issue.yml` — watches completed main runs from CI,
   dependency updates, digest sweeps, locked-image checks, PR cleanup,
   publishing, releases, and workflow lint; maintains a tracking issue.
@@ -246,6 +250,52 @@ missing `gh`, or failed `gh auth status`; once verification starts, failure
 or timeout prevents the pull. `require` makes skip conditions errors, while
 `off` never verifies. Ordinary invocations do not re-verify a locally
 present image, and `--warn` doctor paths never verify.
+
+## Container hardening
+
+Three layers were adopted after a comparative evaluation of Lynis,
+`docker build --check`, Trivy, Grype, Dockle, and hadolint:
+
+- **Dockerfile lint** (`dockerfile-lint` job in `ci.yml`): hadolint
+  v2.15.1 via `hadolint-action` v3.5.0 plus `docker build --check`
+  (BuildKit built-in). `.hadolint.yaml` allows only docker.io and
+  ghcr.io registries and waives DL3008 (exact deb pins rot when Debian
+  archives drop them; downloaded tools are already version+sha256
+  pinned).
+- **Image scan on publish** (`publish-mech-images.yml`): Trivy v0.75.0
+  via `trivy-action` v0.36.0 scans each pushed digest —
+  `mech-tools` (skipped under `skip_tools`) and `mech-server` — for
+  CRITICAL/HIGH fixable vulnerabilities, secrets, and misconfiguration,
+  gated (`exit-code 1`), with SARIF uploaded to code scanning
+  (`category: trivy-mech-tools`, `trivy-mech-server`) and a full JSON
+  report as an artifact. The action is SHA-pinned and `version:` is
+  explicit — the March 2026 Trivy supply-chain compromise made both
+  non-negotiable.
+- **Weekly audit** (`container-audit.yml`, Mondays 03:47 UTC): pulls the
+  pinned `mech_tools` digest from `docker/image-digests.json` (the
+  primary image; `mech_server` is the downstream SDK layer built from it
+  and is already scanned at publish time), re-scans with a fresh
+  vulnerability DB (new CVEs against the frozen image), runs the Docker
+  CIS compliance report, runs an informational in-image Lynis 3.1.7
+  audit, aggregates `container-hardening.json` (artifact), and
+  edits/creates a "Container hardening report" issue. The issue closes
+  automatically when fixable HIGH/CRITICAL findings reach zero. The
+  Lynis Hardening Index is recorded as a trend metric only — its
+  denominator shifts with container-skipped tests, so it never gates.
+
+Not adopted, with reasons: `lynis audit dockerfile` (~6 greps, frozen
+since 2018, subset of hadolint, hardening index always 1);
+Dockle (v0.4.15 stale; its CIS-derived checks are covered by Trivy's
+`--compliance docker-cis` report); Grype (equivalent for the SBOM path,
+kept as fallback); checkov (redundant third linter); `cisofy/lynis`
+Docker image (does not exist — Lynis runs from a pinned git clone);
+non-root USER enforcement and HEALTHCHECK enforcement (CI tools images —
+deferred policy decisions).
+
+Changelog evaluation for the adopted pins is in the introducing PR.
+Suppressions: `.hadolint.yaml` waivers above; `.trivyignore` holds
+time-boxed finding IDs — entries must carry an `exp:` date and a
+rationale line here when added.
 
 ## CI runner network auditing
 
