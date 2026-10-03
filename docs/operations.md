@@ -55,6 +55,14 @@ publish workflow also builds `mech-server` (OpenHands agent-server target
 - `ghcr.io/<owner>/mech-tools:<sha>-tools` (immutable) + `:latest`
 - `ghcr.io/<owner>/mech-server:<sha>-latest-source` + `:latest`
 
+Only the immutable per-sha tags are pushed at build time. The `:latest`
+tags are promoted with `docker buildx imagetools create` (a server-side
+manifest copy, so provenance/SBOM attestations keep referencing the same
+digest) only after the Trivy fixable-CVE gates and the tools smoke check
+pass — a gate failure leaves the previous good `:latest` untouched.
+`workflow_dispatch` is additionally restricted to `refs/heads/main` so a
+manual run cannot sign and push images from an arbitrary ref.
+
 The tools image installs `librsvg2-bin` (unpinned Debian 13 apt) for
 `mech_render` / `python -m mech render`, which turns an exported `.dxf`
 into an `.svg` (ezdxf `SVGBackend`, in-process) plus a `.png`
@@ -117,7 +125,9 @@ Local build and run instructions live in `docker/README.md`.
   candidates to the "Dependency update check report" issue. Fetch failures
   are reported as unknown and keep the issue open.
 - `digest-lock-sweep.yml` — periodically retries merging eligible digest-lock
-  PRs while required checks remain enforced.
+  PRs while required checks remain enforced; after a sweep merge it
+  dispatches `ci.yml` and `locked-image-check.yml` on main (a token merge
+  does not fire push-triggered workflows).
 - `publish-mech-images.yml` — builds and publishes the GHCR images, attests
   the tools image, and updates the digest lock via a self-merging PR (see
   "Container images").
@@ -127,8 +137,10 @@ Local build and run instructions live in `docker/README.md`.
   plus Docker CIS and informational Lynis reports; maintains the
   "Container hardening report" issue (see "Container hardening").
 - `main-ci-failure-issue.yml` — watches completed main runs from CI,
-  dependency updates, digest sweeps, locked-image checks, PR cleanup,
-  publishing, releases, and workflow lint; maintains a tracking issue.
+  the container hardening audit, dependency updates, digest sweeps,
+  locked-image checks, PR cleanup, publishing, releases, scorecard, and
+  workflow lint; maintains a tracking issue. Concurrency keys on the
+  triggering run id so queued reports are not evicted.
 - `pr-branch-cleanup.yml` — removes merged PR branches.
 - `release.yml` — manual dispatch only (see below).
 
@@ -150,6 +162,14 @@ the image publish job (the lock-update PR needs push credentials).
 3. `release` zips `plugins/mech` and creates `vX.Y.Z` with generated notes.
 
 Update `CHANGELOG.md` in the release PR before dispatching.
+
+`dry_run: true` rehearses the flow: `bump-version` validates the version
+arithmetic and tag availability against HEAD without committing, pushing,
+or opening the bump PR; `verify`, `install-smoke`, and the zip build run
+on that SHA; the tag and `gh release create` steps are skipped. Use it to
+exercise the pipeline before the first real release — the version-bump
+fallback-PR path is the one piece a dry run still cannot reach (it ends in
+a merge to main).
 
 ## Dependency updates
 
@@ -277,7 +297,8 @@ Three layers were adopted after a comparative evaluation of Lynis,
   and is already scanned at publish time), re-scans with a fresh
   vulnerability DB (new CVEs against the frozen image), runs the Docker
   CIS compliance report, runs an informational in-image Lynis 3.1.7
-  audit, aggregates `container-hardening.json` (artifact), and
+  audit, aggregates `container-hardening.json` (artifact, together with
+  `trivy-image.json` and `trivy-cis.json`), and
   edits/creates a "Container hardening report" issue. The issue closes
   automatically when fixable HIGH/CRITICAL findings reach zero. The
   Lynis Hardening Index is recorded as a trend metric only — its
@@ -289,8 +310,11 @@ Dockle (v0.4.15 stale; its CIS-derived checks are covered by Trivy's
 `--compliance docker-cis` report); Grype (equivalent for the SBOM path,
 kept as fallback); checkov (redundant third linter); `cisofy/lynis`
 Docker image (does not exist — Lynis runs from a pinned git clone);
-non-root USER enforcement and HEALTHCHECK enforcement (CI tools images —
-deferred policy decisions).
+non-root USER enforcement and HEALTHCHECK enforcement (AVD-DS-0002 and
+AVD-DS-0026 — expected findings on a batch CLI tools image run via
+`docker run --rm` under `mech_launcher.py`'s `--user uid:gid` and
+`--cap-drop ALL` runtime flags; documented here rather than waived so the
+CIS column stays honest).
 
 Changelog evaluation for the adopted pins is in the introducing PR.
 Suppressions: `.hadolint.yaml` waivers above; `.trivyignore` holds
@@ -323,8 +347,10 @@ The weekly audit runs Lynis as container root (`--user 0`) with the
 committed `docker/lynis-container.prf` profile, which skips tests that
 are inapplicable inside a container (kernel/systemd/mounts/storage/
 network/PAM/accounting are governed by the runtime flags below, not the
-image fs). The profile raises the measured Hardening Index from ~62 to
-~68 and reduces the suggestion list to image-actionable items;
+image fs). The profile raises the measured Hardening Index from ~62 —
+63 on the 2026-10-03 audit run; the index drifts as upstream Lynis adds
+or drops tests, so treat it as a trend, not a target — and reduces the
+suggestion list to image-actionable items;
 remaining suggestions are fixed in the Dockerfile (`UMASK 027` in
 login.defs, Lynis AUTH-9328) or silenced only with a documented reason.
 Because the tightened umask makes Lynis write its report and log 0640
@@ -339,7 +365,13 @@ tmpfs for tools that need scratch space.
 
 ## CI runner network auditing
 
-CI and image-publishing jobs use `step-security/harden-runner` in audit-only mode. It observes network egress without blocking requests; per-run insights are available in the GitHub Actions job summary.
+Every job in the repo-owned workflows uses `step-security/harden-runner`
+in audit-only mode. It observes network egress without blocking requests;
+per-run insights are available in the GitHub Actions job summary. The five
+hash-locked family-canonical workflows (`pr-branch-cleanup.yml`,
+`dependency-review.yml`, `scorecard.yml`, `workflow-lint.yml`,
+`main-ci-failure-issue.yml`) carry it only once the family canon adds it —
+shared files must stay byte-identical across the sibling repos.
 
 ## Digest-lock PR verification
 

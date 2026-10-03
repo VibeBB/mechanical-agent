@@ -40,7 +40,7 @@ the adoption decision for each. Update it in the same change that touches
 | --- | --- | --- |
 | uv | `==0.12.22` | `[tool.uv] required-version` |
 | Python | `>=3.12`, CI matrix 3.12/3.13 | pyproject `requires-python` |
-| zizmor | `1.30.1` (uvx pin) | `workflow-lint.yml` |
+| zizmor | `1.30.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
 
 ## GitHub Actions pins
 
@@ -56,6 +56,8 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | docker/build-push-action | v7.4.0 |
 | actions/upload-artifact | v7.0.1 |
 | actions/attest-build-provenance | v4.2.2 |
+| actions/cache | v4.3.0 |
+| step-security/harden-runner | v2.21.1 |
 
 ## Docker image pins
 
@@ -70,7 +72,7 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 
 | Item | Pin | Where |
 | --- | --- | --- |
-| CISOfy/lynis | `3.1.7` | `git clone --depth 1 --branch` in `container-audit.yml` |
+| CISOfy/lynis | `3.1.7` | `git clone --depth 1 --branch` + `checkout --detach 2e99f922` in `container-audit.yml` |
 
 The checker treats `git clone --branch <ref>` pins inside workflows as a
 `git-clone` surface and compares the ref against the upstream repo's
