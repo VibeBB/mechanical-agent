@@ -43,6 +43,9 @@ jobs:
   publish:
     runs-on: ubuntu-26.04
     timeout-minutes: 120
+    # Manual dispatch inherits the full write permission set below, so it
+    # must never build/sign/push images from a non-main ref.
+    if: github.ref == 'refs/heads/main'
     # actions approves approval-gated runs and dispatches the lock-branch and
     # post-merge checks; contents pushes the lock branch; packages pushes the
     # ghcr.io images; pull-requests opens and merges the digest-lock PR.
@@ -65,6 +68,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
+          cache-suffix: publish
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -98,11 +102,30 @@ jobs:
           build-args: |
             IMAGE_REVISION=${{ github.sha }}
           push: true
+          # Only the immutable per-sha tag is pushed at build time; the
+          # mutable :latest tag is promoted after every gate below passes,
+          # so a failed scan never serves a new :latest.
           tags: |
             ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
-            ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # A failed cache export must not fail the publish; gha cache
+          # imports already degrade to a miss rather than an error, so
+          # ignore-error applies to cache-to only.
+          cache-to: type=gha,mode=max,ignore-error=true
+      # The full JSON scan runs before the SARIF gate so the diagnostic
+      # report exists even when the gate fails — exactly when it is needed.
+      - name: Scan tools image (Trivy JSON)
+        if: inputs.skip_tools != true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: false
+          exit-code: '0'
+          format: json
+          output: trivy-mech-tools-report.json
       - name: Scan tools image (Trivy SARIF)
         if: inputs.skip_tools != true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -119,27 +142,15 @@ jobs:
           format: sarif
           output: trivy-mech-tools.sarif
           limit-severities-for-sarif: true
-      - name: Scan tools image (Trivy JSON)
-        if: inputs.skip_tools != true
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
-          version: v0.75.0
-          scanners: vuln,secret,misconfig,license
-          ignore-unfixed: false
-          exit-code: '0'
-          format: json
-          output: trivy-mech-tools-report.json
           skip-setup-trivy: true
       - name: Upload tools Trivy SARIF
-        if: always() && inputs.skip_tools != true
+        if: always() && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-mech-tools.sarif
           category: trivy-mech-tools
       - name: Upload tools Trivy JSON report
-        if: always() && inputs.skip_tools != true
+        if: always() && inputs.skip_tools != true && hashFiles('trivy-mech-tools-report.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mech-tools-trivy
@@ -295,8 +306,21 @@ jobs:
             "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}" | tr -d '"')
           case "$SERVER_DIGEST" in sha256:*) ;; *) echo "invalid server digest: $SERVER_DIGEST" >&2; exit 1 ;; esac
           printf 'SERVER_TAG=%s\nSERVER_DIGEST=%s\n' "$SERVER_TAG" "$SERVER_DIGEST" >> "$GITHUB_ENV"
-          docker buildx imagetools create --tag "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
-            "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}"
+      - name: Scan server image (Trivy JSON)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
+          version: v0.75.0
+          scanners: vuln,secret,misconfig,license
+          ignore-unfixed: false
+          exit-code: '0'
+          format: json
+          output: trivy-mech-server-report.json
+          # The upstream agent-server image vendors >10MB web assets
+          # (workbench.js, pydeck index.js.map) that trivy's secret scanner
+          # skips silently; naming them makes the blind spot deliberate.
+          skip-files: "**/workbench.js,**/index.js.map"
       - name: Scan server image (Trivy SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -310,26 +334,16 @@ jobs:
           format: sarif
           output: trivy-mech-server.sarif
           limit-severities-for-sarif: true
-      - name: Scan server image (Trivy JSON)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
-          version: v0.75.0
-          scanners: vuln,secret,misconfig,license
-          ignore-unfixed: false
-          exit-code: '0'
-          format: json
-          output: trivy-mech-server-report.json
+          skip-files: "**/workbench.js,**/index.js.map"
           skip-setup-trivy: true
       - name: Upload server Trivy SARIF
-        if: always()
+        if: always() && hashFiles('trivy-mech-server.sarif') != ''
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-mech-server.sarif
           category: trivy-mech-server
       - name: Upload server Trivy JSON report
-        if: always()
+        if: always() && hashFiles('trivy-mech-server-report.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mech-server-trivy
@@ -359,6 +373,23 @@ jobs:
             echo "- **server tag**: \`$SERVER_TAG\`"
             echo "- **workflow run**: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Promote :latest
+        # Every gate above passed: point the mutable tags at the attested
+        # digests. imagetools create copies the manifest server-side — no
+        # re-push — so the provenance and SBOM attestations keep
+        # referencing the same digest.
+        env:
+          SKIP_TOOLS: ${{ inputs.skip_tools }}
+        run: |
+          set -euo pipefail
+          if [ "$SKIP_TOOLS" != true ]; then
+            docker buildx imagetools create \
+              "ghcr.io/${IMAGE_OWNER}/mech-tools:latest" \
+              "$TOOLS_REF"
+          fi
+          docker buildx imagetools create \
+            "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
+            "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
       - name: Update digest lock and merge PR
         env:
           GH_TOKEN: ${{ github.token }}
