@@ -13,6 +13,13 @@
       "latest": "2.2.0",
       "review_by": "2027-04-01",
       "reason": "openhands-sdk 1.50.1 requires fastmcp>=3.2.0,<4, which requires mcp<2.0. Defer MCP 2.x until a supported SDK/fastmcp release removes that constraint."
+    },
+    {
+      "surface": "pypi",
+      "name": "openhands-sdk",
+      "latest": "1.51.0",
+      "review_by": "2027-01-03",
+      "reason": "The mech-server image is assembled by the upstream agent-server build (sdk:openhands-agent-server/v1.50.1); its .venv packages (pypdf, urllib3, virtualenv, wheel, setuptools, msgpack, jaraco.context), nodejs_wheel node_modules, bundled Go binaries (rootlesskit, docker-buildx), and shipped Dockerfile copies (DS-0029) carry 70 upstream-borne Trivy findings currently covered by expiring .trivyignore waivers. Defer the bump until its changelog review confirms compatibility, then re-scan and drop cleared waivers."
     }
   ]
 }
