@@ -95,6 +95,17 @@ def test_publish_never_pushes_latest_before_the_trivy_gate() -> None:
     )
     after = next(i for i, s in enumerate(steps) if s.get("name") == "Promote :latest")
     assert gate < after, ":latest must be promoted only after the Trivy gate"
+    build = next(s for s in steps if s.get("name") == "Build and publish server")
+    build_env: dict[Any, Any] = build.get("env") or {}
+    assert "CUSTOM_TAGS" not in build_env, (
+        "the server build must not push the mutable -latest-source tags "
+        "eagerly; they are promoted after the gate"
+    )
+    promote_run: str = promote[0]["run"]
+    assert "-latest-source" in promote_run and "main-latest-source" in promote_run, (
+        "the promote step must re-issue the mutable -latest-source tags "
+        "server-side so the tag contract survives gating"
+    )
 
 
 def test_ci_pytest_enforces_the_coverage_floor() -> None:
