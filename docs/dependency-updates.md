@@ -41,6 +41,8 @@ the adoption decision for each. Update it in the same change that touches
 | uv | `==0.12.22` | `[tool.uv] required-version` |
 | Python | `>=3.12`, CI matrix 3.12/3.13 | pyproject `requires-python` |
 | zizmor | `1.30.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
+| actionlint | `1.7.12` (sha256-verified release tarball) | `workflow-lint.yml` |
+| trivy | `v0.75.0` (`version:` input on `aquasecurity/trivy-action` + `aquasecurity/setup-trivy`) | `publish-mech-images.yml`, `container-audit.yml` |
 
 ## GitHub Actions pins
 
@@ -96,8 +98,16 @@ state columns `update available` / `deferred` / `up to date`. Surfaces:
   Dockerfile `uv python install`, and the CI matrix, against the latest
   stable CPython minor tag.
 - `github-actions` — `uses:` SHA pins against the latest repo tag (the
-  `# vX.Y.Z` comment is the recorded current version).
+  `# vX.Y.Z` comment is the recorded current version). Subpath actions
+  such as `github/codeql-action/upload-sarif` are tracked under their full
+  path and compared against the parent repository's tags.
 - `pypi-uvx` — `uvx tool@version` pins in workflows against PyPI.
+- `workflow-download` — direct-download pins inside workflows: GitHub
+  `releases/download` tarballs (actionlint) against the upstream repo tag,
+  sha256-verified PyPI wheels (zizmor) against the latest PyPI release,
+  `sha256sum -c` echo pairs shape-checked as 64 lowercase hex, and
+  `version:` inputs on aquasecurity actions against the latest
+  `aquasecurity/trivy` tag.
 - `docker-arg` — Dockerfile `ARG UV_VERSION` against the latest
   `astral-sh/uv` tag; the ARG is asserted equal to `[tool.uv]
   required-version` by a unit test.

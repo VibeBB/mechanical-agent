@@ -71,12 +71,18 @@ def test_failure_watchlist_covers_every_main_workflow() -> None:
 
 def test_container_audit_cis_aggregation_walks_nested_results_and_fails_loud() -> None:
     text = (WORKFLOWS / "container-audit.yml").read_text(encoding="utf-8")
+    script = (ROOT / "scripts/container_hardening_report.py").read_text(encoding="utf-8")
+    # The CIS scan exits 0 even on an empty payload, so the workflow must
+    # gate the report on a non-empty payload check, with one retry.
+    assert "--check-cis trivy-cis.json" in text
+    assert "empty payload; retrying once" in text
+    assert "python3 scripts/container_hardening_report.py" in text
     # trivy --compliance nests MisconfSummary under Results[].Results[]; a
     # flat read silently reports 0/0, so the aggregator must recurse and
     # must fail when the scan produced nothing.
-    assert "def _summaries(node):" in text
-    assert "yield from _summaries(child)" in text
-    assert 'sys.exit("Docker CIS scan produced no results")' in text
+    assert "def _summaries(node" in script
+    assert "yield from _summaries(child)" in script
+    assert 'sys.exit("Docker CIS scan produced no results")' in script
 
 
 def test_publish_never_pushes_latest_before_the_trivy_gate() -> None:

@@ -115,6 +115,20 @@ approve_gated_runs() {
   done <<< "$run_ids"
 }
 
+workflow_already_covers_head() {
+  local workflow=$1 head_sha count
+  # A lock-branch PR triggers pull_request runs on its own head SHA; a
+  # manual dispatch of the same workflow on the same head is a duplicate.
+  head_sha=$(retry gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" \
+    --json headRefOid --jq '.headRefOid' 2>/dev/null || true)
+  [ -n "$head_sha" ] || return 1
+  count=$(retry gh api \
+    "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?event=pull_request&branch=${BRANCH}&per_page=20" \
+    --jq "[.workflow_runs[] | select(.head_sha==\"${head_sha}\")] | length" \
+    2>/dev/null || true)
+  [ "${count:-0}" -gt 0 ] 2>/dev/null
+}
+
 dispatch_pin_workflow() {
   local workflow=$1
   local -a command=(gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "$BRANCH")
@@ -122,6 +136,10 @@ dispatch_pin_workflow() {
     command+=(-f "base_sha=$BASE_SHA")
   fi
   check_pin_pr_state
+  if workflow_already_covers_head "$workflow"; then
+    write_summary "${workflow} pull_request run already covers the pin PR head SHA; skipping duplicate dispatch."
+    return 0
+  fi
   if ! retry "${command[@]}"; then
     check_pin_pr_state
     write_summary "Dispatch of ${workflow} for pin PR ${PR_URL} failed; required PR checks remain authoritative."

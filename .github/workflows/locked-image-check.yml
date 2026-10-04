@@ -3,6 +3,13 @@ name: Locked image check
 on:
   push:
     branches: [main]
+    # Only run the full pull+attestation+smoke when a lock file it covers
+    # actually changed; the publisher dispatches this workflow post-merge
+    # and the weekly sweep covers drift, so every other main push is
+    # pure cost (~2 min, ~500 MB image pull).
+    paths:
+      - docker/image-digests.json
+      - plugins/mech/skills/mech-workflow/tools-image.json
   schedule:
     - cron: "40 0 * * 1"
   workflow_dispatch:

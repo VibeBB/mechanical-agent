@@ -22,11 +22,15 @@ set -eu
 printf '%s\\n' "$*" >> "$GH_STUB_CALLS"
 case "$1 $2" in
   "pr view")
-    case "$GH_STUB_CASE" in
-      merged) printf 'MERGED\\n' ;;
-      closed) printf 'CLOSED\\n' ;;
-      *) printf 'OPEN\\n' ;;
-    esac
+    if [[ "$*" == *headRefOid* ]]; then
+      printf 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\\n'
+    else
+      case "$GH_STUB_CASE" in
+        merged) printf 'MERGED\\n' ;;
+        closed) printf 'CLOSED\\n' ;;
+        *) printf 'OPEN\\n' ;;
+      esac
+    fi
     ;;
   "workflow run")
     ;;
@@ -82,6 +86,12 @@ case "$1 $2" in
   api\\ *)
     if [[ "$*" == *"-X POST"*"/approve"* ]]; then
       printf 'approval response noise\\n'
+    elif [[ "$*" == *"/runs?"* ]]; then
+      # post-jq [..matching head_sha..] | length
+      case "$GH_STUB_CASE" in
+        covers-head) printf '1\\n' ;;
+        *) printf '0\\n' ;;
+      esac
     else
       printf '77\\n'
     fi
@@ -94,6 +104,10 @@ esac
     summary = tmp_path / "summary.md"
     calls = tmp_path / "calls.log"
     env = os.environ.copy()
+    # A BASH_ENV-exported gh() shell function would shadow the PATH stub
+    # inside the script under test (verify_all runs with one set).
+    env.pop("BASH_ENV", None)
+    env = {key: value for key, value in env.items() if not key.startswith("BASH_FUNC_gh")}
     env.update(
         {
             "PATH": f"{bin_dir}:{env['PATH']}",
@@ -193,6 +207,23 @@ def test_unreported_checks_transition_to_green_json(
     assert "Auto-merge remains armed" in summary
     assert "no checks reported" not in result.stderr
     assert "no required checks reported" not in result.stderr
+
+
+def test_pull_request_run_covering_head_skips_duplicate_dispatch(
+    publish_pin_pr: tuple[Path, dict[str, str], Path],
+    tmp_path: Path,
+) -> None:
+    script, env, calls = publish_pin_pr
+    env["GH_STUB_CASE"] = "covers-head"
+
+    result = run_helper(script, env)
+    summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
+    call_log = calls.read_text(encoding="utf-8")
+
+    assert result.returncode == 0
+    assert "already covers the pin PR head SHA; skipping duplicate dispatch" in summary
+    assert "/runs?event=pull_request&branch=" in call_log
+    assert "workflow run" not in call_log
 
 
 def test_no_required_checks_arms_auto_merge(
