@@ -59,6 +59,11 @@ jobs:
         run: uv run pytest --cov --cov-report=term-missing:skip-covered
       - name: Docs
         run: uv run python scripts/verify_docs.py
+      - name: Shared checks
+        run: |
+          git diff --check
+          uv run python scripts/check_shared_hooks.py
+          uv run python scripts/check_shared_workflows.py
 
   dockerfile-lint:
     runs-on: ubuntu-26.04
