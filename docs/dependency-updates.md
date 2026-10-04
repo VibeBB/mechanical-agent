@@ -38,8 +38,8 @@ the adoption decision for each. Update it in the same change that touches
 
 | Tool | Pin | Where |
 | --- | --- | --- |
-| uv | `==0.12.22` | `[tool.uv] required-version` |
-| Python | `>=3.12`, CI matrix 3.12/3.13 | pyproject `requires-python` |
+| uv | `==0.12.23` | `[tool.uv] required-version` |
+| Python | `>=3.12`, CI matrix 3.12/3.13/3.14 + 3.15 canary | pyproject `requires-python` |
 | zizmor | `1.30.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
 | actionlint | `1.7.12` (sha256-verified release tarball) | `workflow-lint.yml` |
 | trivy | `v0.75.0` (`version:` input on `aquasecurity/trivy-action` + `aquasecurity/setup-trivy`) | `publish-mech-images.yml`, `container-audit.yml` |
@@ -66,8 +66,8 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | Item | Pin | Where |
 | --- | --- | --- |
 | debian base image | `13-slim` | `docker/mech-tools.Dockerfile` `FROM` |
-| uv | `0.12.22` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
-| Python in image | `3.12` | `uv python install` inside the Dockerfile |
+| uv | `0.12.23` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
+| Python in image | `3.14` | `uv python install`/`uv venv`/`python3.x` inside the Dockerfile |
 | librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
 
 ## Workflow git clone pins
@@ -94,9 +94,11 @@ state columns `update available` / `deferred` / `up to date`. Surfaces:
 - `pypi-lock` — transitive `uv.lock` drift from `uv lock --upgrade
   --dry-run` (Update/Add/Remove lines); only drifted entries are listed.
 - `uv-pin` — `[tool.uv] required-version` against PyPI `uv`.
-- `python-version` — Python minors referenced by `requires-python`, the
-  Dockerfile `uv python install`, and the CI matrix, against the latest
-  stable CPython minor tag.
+- `python-version` — Python minors referenced by `requires-python`, every
+  workflow's `python-version:` inputs and quoted `"3.x"` pins, the
+  `.python-version` dotfile, and the Dockerfiles' `uv python install`/`uv
+  venv --python`/`python3.x` pins, against the latest stable CPython minor
+  tag.
 - `github-actions` — `uses:` SHA pins against the latest repo tag (the
   `# vX.Y.Z` comment is the recorded current version). Subpath actions
   such as `github/codeql-action/upload-sarif` are tracked under their full
@@ -146,7 +148,6 @@ only while `review_by` has not passed and still matches the reported
 | Surface | Name | Latest | Re-check | Reason |
 | --- | --- | --- | --- | --- |
 | pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.51.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
-| python-version | * | 3.14 | 2027-04-01 | Matrix is 3.12/3.13; SDK support and build123d/OCP wheels for 3.14 unconfirmed. |
 
 ## Not covered
 
@@ -154,3 +155,19 @@ only while `review_by` has not passed and still matches the reported
 - Transitive dependencies stay pinned in `uv.lock`; the `pypi-lock`
   surface reports drift but bumps still ride direct spec changes
   (`uv lock --upgrade` when applied).
+
+## Decisions - 2026-10-04 round
+
+Adopted now:
+
+| Component | From | To | Evaluation |
+|-----------|------|----|------------|
+| uv | 0.12.22 | 0.12.23 | Point release; dependency resolution and managed-Python fixes. No workflow changes required. |
+| Python pins | 3.12 | 3.14 | Image `uv python install`/`uv venv`/`python3.x` and `.python-version` now resolve 3.14; ci.yml matrix gains a 3.14 leg. |
+| Python 3.15 | - | canary leg | Experimental matrix leg runs each step with `continue-on-error`; a `::warning::` annotation records forward-compat failures without failing the check. |
+
+Deferred:
+
+| Candidate | Reason | Re-check |
+|-----------|--------|----------|
+| Python 3.15 as default | `openhands-sdk` -> `fastuuid==0.14.0` -> PyO3 0.26 caps supported interpreters at 3.14; `uv sync` fails on 3.15 today. The canary leg detects when upstream wheels land. | After 3.15 GA (2026-10-09) and a PyO3 0.27-wheel fastuuid release. |
