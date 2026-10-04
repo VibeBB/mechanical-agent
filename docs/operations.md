@@ -125,17 +125,32 @@ Local build and run instructions live in `docker/README.md`.
   candidates to the "Dependency update check report" issue. Fetch failures
   are reported as unknown and keep the issue open.
 - `digest-lock-sweep.yml` — periodically retries merging eligible digest-lock
-  PRs while required checks remain enforced; after a sweep merge it
-  dispatches `ci.yml` and `locked-image-check.yml` on main (a token merge
-  does not fire push-triggered workflows).
+  PRs while required checks remain enforced; after a sweep merge (or a
+  recent lock merge with no matching dispatch) it dispatches `ci.yml` and
+  `locked-image-check.yml` on main (a token merge does not fire
+  push-triggered workflows). The merge/dispatch logic lives in
+  `scripts/digest_lock_sweep.sh` under pytest; a failed dispatch fails the
+  job. The job checks out the repo only to run that script, behind a
+  GitHub-API-only egress allowlist.
 - `publish-mech-images.yml` — builds and publishes the GHCR images, attests
   the tools image, and updates the digest lock via a self-merging PR (see
-  "Container images").
+  "Container images"). The four Trivy scans share the weekly `cache-trivy-`
+  vulnerability-DB entry restored read-only (`lookup-only` — saved by the
+  weekly audit); a failed SARIF gate renders the fixable HIGH/CRITICAL
+  findings into the run summary via `scripts/trivy_gate_summary.py`. The
+  pin-PR helper skips a manual dispatch when a pull_request run already
+  covers the same head SHA.
 - `locked-image-check.yml` — weekly + post-publish smoke of the locked
-  image (see "Container images").
+  image (see "Container images"); main pushes trigger it only when a lock
+  file changed, since the post-publish dispatch and weekly sweep already
+  cover the rest.
 - `container-audit.yml` — weekly Trivy re-scan of the locked tools image
   plus Docker CIS and informational Lynis reports; maintains the
-  "Container hardening report" issue (see "Container hardening").
+  "Container hardening report" issue (see "Container hardening"). Also
+  runs on main pushes that touch its inputs (the workflow, `.trivyignore`,
+  the digest lock, the Lynis profile, or the report script). Aggregation
+  lives in `scripts/container_hardening_report.py` under pytest; the CIS
+  scan retries once on an empty payload before failing.
 - `main-ci-failure-issue.yml` — watches completed main runs from CI,
   the container hardening audit, dependency updates, digest sweeps,
   locked-image checks, PR cleanup, publishing, releases, scorecard, and
@@ -176,7 +191,7 @@ a merge to main).
 Follow [dependency-updates.md](dependency-updates.md). Weekly candidates
 land in the "Dependency update check report" issue as per-surface markdown
 tables (pypi, pypi-lock, uv-pin, python-version, github-actions, pypi-uvx,
-docker-arg, docker-base, apt, git-clone). To defer a candidate, record
+workflow-download, docker-arg, docker-base, apt, git-clone). To defer a candidate, record
 `{surface, name, latest, review_by, reason}` in
 `scripts/dependency_update_deferrals.json` and revisit on the deadline or
 when a newer version appears. When adding/removing a dependency or a new
@@ -296,8 +311,11 @@ Three layers were adopted after a comparative evaluation of Lynis,
   primary image; `mech_server` is the downstream SDK layer built from it
   and is already scanned at publish time), re-scans with a fresh
   vulnerability DB (new CVEs against the frozen image), runs the Docker
-  CIS compliance report, runs an informational in-image Lynis 3.1.7
-  audit, aggregates `container-hardening.json` (artifact, together with
+  CIS compliance report (one retry when the scan returns an empty payload —
+  the compliance reporter exits 0 on dead telemetry), runs an
+  informational in-image Lynis 3.1.7
+  audit, aggregates `container-hardening.json` via
+  `scripts/container_hardening_report.py` (artifact, together with
   `trivy-image.json` and `trivy-cis.json`), and
   edits/creates a "Container hardening report" issue. The issue closes
   automatically when fixable HIGH/CRITICAL findings reach zero. The
@@ -412,6 +430,12 @@ here so audits do not re-flag them:
   only add friction to a pipeline that already gates on the required-check
   set. OpenSSF Scorecard reports this as Branch-Protection 3 and
   Code-Review 0; that is the recorded trade-off, not an oversight.
+- The same posture explains the remaining scorecard zeros: CII-Best-Practices
+  (no badge application for a solo-maintained internal tool), Fuzzing (no
+  fuzz harness — the deterministic gates are the verifier), and
+  Signed-Releases (resolves automatically once `release.yml` runs its
+  first real release and signs the tag). The ~6.6 aggregate score is a
+  documented floor under these trade-offs, not a gap to chase.
 - The Dependency graph must stay enabled for `dependency-review.yml` to
   evaluate pull requests.
 - `release.yml` is dispatch-only; run it once with `dry_run=true` before
