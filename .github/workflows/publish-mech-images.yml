@@ -31,6 +31,11 @@ on:
         required: false
         default: false
         type: boolean
+      dry_run:
+        description: "Rehearse the publish: build and gate the images locally, but skip the registry push, :latest promotion, attestations, SARIF upload, the digest-lock PR, and post-merge dispatches"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: publish-mech-images
@@ -115,7 +120,10 @@ jobs:
           file: docker/mech-tools.Dockerfile
           build-args: |
             IMAGE_REVISION=${{ github.sha }}
-          push: true
+          # dry_run keeps the image in the local daemon for the gates
+          # below; nothing reaches the registry.
+          push: ${{ inputs.dry_run != true }}
+          load: ${{ inputs.dry_run == true }}
           # Only the immutable per-sha tag is pushed at build time; the
           # mutable :latest tag is promoted after every gate below passes,
           # so a failed scan never serves a new :latest.
@@ -136,7 +144,10 @@ jobs:
           TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
+          # Scan the immutable sha tag — the same manifest the pushed
+          # digest addresses on a real run, and the local image under
+          # dry_run.
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
           version: v0.75.0
           scanners: vuln,secret,misconfig,license
           ignore-unfixed: false
@@ -150,9 +161,10 @@ jobs:
           TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
-          # Scan the exact pushed digest — the content the SBOM and
-          # provenance attestations bind to.
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools@${{ steps.tools.outputs.digest }}
+          # Scan the immutable sha tag — the manifest the SBOM and
+          # provenance attestations bind to on a real run (the local
+          # image under dry_run).
+          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
           version: v0.75.0
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
@@ -168,7 +180,8 @@ jobs:
         if: failure() && inputs.skip_tools != true && hashFiles('trivy-mech-tools-report.json') != ''
         run: python3 scripts/trivy_gate_summary.py trivy-mech-tools-report.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload tools Trivy SARIF
-        if: always() && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
+        # A rehearsal must not file code-scanning alerts.
+        if: always() && inputs.dry_run != true && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-mech-tools.sarif
@@ -182,7 +195,7 @@ jobs:
           retention-days: 90
       - name: Attest tools image provenance
         id: attest
-        if: inputs.skip_tools != true
+        if: inputs.skip_tools != true && inputs.dry_run != true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ghcr.io/vibebb/mech-tools
@@ -191,23 +204,35 @@ jobs:
       - name: Resolve tools digest
         env:
           BUILT_DIGEST: ${{ steps.tools.outputs.digest }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.skip_tools }}" = true ]; then
             TOOLS_REF=$(uv run python scripts/print_locked_image.py --entry mech_tools)
             uv run python scripts/pull_locked_image.py --entry mech_tools --record "$RUNNER_TEMP/pull-tools.json"
             TOOLS_TAG=$(python3 -c 'import json; print(json.load(open("docker/image-digests.json", encoding="utf-8"))["mech_tools"]["tag"])')
+          elif [ "$DRY_RUN" = "true" ]; then
+            # Nothing was pushed: retag the daemon-local image under a
+            # slash-free name the measurement probe accepts, and reference
+            # it everywhere below.
+            docker tag \
+              "ghcr.io/${IMAGE_OWNER}/mech-tools:${SOURCE_SHA}-tools" \
+              "mech-tools:${SOURCE_SHA}-rehearsal"
+            TOOLS_REF="mech-tools:${SOURCE_SHA}-rehearsal"
+            TOOLS_DIGEST="${BUILT_DIGEST:-unpublished}"
+            TOOLS_TAG="${SOURCE_SHA}-tools"
           else
             case "$BUILT_DIGEST" in sha256:*) ;; *) echo "invalid tools digest: $BUILT_DIGEST" >&2; exit 1 ;; esac
             TOOLS_REF="ghcr.io/${IMAGE_OWNER}/mech-tools@${BUILT_DIGEST}"
             TOOLS_TAG="${SOURCE_SHA}-tools"
           fi
-          printf 'TOOLS_REF=%s\nTOOLS_DIGEST=%s\nTOOLS_TAG=%s\n' "$TOOLS_REF" "${TOOLS_REF##*@}" "$TOOLS_TAG" >> "$GITHUB_ENV"
+          printf 'TOOLS_REF=%s\nTOOLS_DIGEST=%s\nTOOLS_TAG=%s\n' "$TOOLS_REF" "${TOOLS_DIGEST:-${TOOLS_REF##*@}}" "$TOOLS_TAG" >> "$GITHUB_ENV"
       - name: Generate tools SPDX SBOM
         if: inputs.skip_tools != true
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         env:
-          SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: registry
+          # dry_run reads the just-built image from the local daemon.
+          SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: ${{ inputs.dry_run == true && 'docker' || 'registry' }}
           TMPDIR: ${{ runner.temp }}
           SYFT_FILE_METADATA_SELECTION: none
         with:
@@ -249,7 +274,7 @@ jobs:
               raise SystemExit("tools SBOM must use SPDX-2.3")
           PY
       - name: Attest tools SBOM
-        if: inputs.skip_tools != true
+        if: inputs.skip_tools != true && inputs.dry_run != true
         id: attest_sbom
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -275,11 +300,15 @@ jobs:
       - name: Verify published tools smoke
         env:
           TOOLS_REF: ${{ env.TOOLS_REF }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/mech-smoke"
           chmod 777 "$RUNNER_TEMP/mech-smoke"
-          docker pull "$TOOLS_REF"
+          # dry_run already holds the image in the local daemon.
+          if [ "$DRY_RUN" != "true" ]; then
+            docker pull "$TOOLS_REF"
+          fi
           docker run --rm --user mech \
             --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$TOOLS_REF" \
             python /opt/mech/scripts/e2e_authoring.py \
@@ -316,18 +345,26 @@ jobs:
         name: Build and publish server
         env:
           SDK_SHA: ${{ github.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
           # No CUSTOM_TAGS: the mutable tags (<sha>-latest-source and
           # main-latest-source) are promoted after every gate below passes,
           # so a failed scan never serves a new mutable tag.
         run: |
           set -euo pipefail
+          # dry_run loads the server image into the local daemon instead
+          # of pushing it; every gate below still runs against it.
+          push_flag=--push
+          if [ "$DRY_RUN" = "true" ]; then
+            push_flag=--load
+          fi
           uv run --project "$RUNNER_TEMP/sdk" python \
             "$RUNNER_TEMP/sdk/openhands-agent-server/openhands/agent_server/docker/build.py" \
             --base-image "$TOOLS_REF" --image "ghcr.io/${IMAGE_OWNER}/mech-server" \
-            --target source --platforms linux/amd64 --push --sdk-project-root "$RUNNER_TEMP/sdk"
+            --target source --platforms linux/amd64 "$push_flag" --sdk-project-root "$RUNNER_TEMP/sdk"
       - name: Resolve server digest
         env:
           BUILD_TAGS_CSV: ${{ steps.build_server.outputs.tags_csv }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           SERVER_TAG=$(
@@ -338,17 +375,32 @@ jobs:
           if [ -z "$SERVER_TAG" ]; then
             echo "no mech-server tag in build output tags_csv" >&2; exit 1
           fi
-          SERVER_DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' \
-            "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}" | tr -d '"')
+          if [ "$DRY_RUN" = "true" ]; then
+            # Rehearsal: the image lives only in the local daemon, so
+            # resolve it locally and retag it under a slash-free name the
+            # measurement probe accepts.
+            docker tag \
+              "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}" \
+              "mech-server:${GITHUB_SHA}-rehearsal"
+            SERVER_DIGEST=$(docker image inspect \
+              --format '{{.Id}}' "mech-server:${GITHUB_SHA}-rehearsal")
+            SERVER_REF="mech-server:${GITHUB_SHA}-rehearsal"
+          else
+            SERVER_DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' \
+              "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}" | tr -d '"')
+            SERVER_REF="ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
+          fi
           case "$SERVER_DIGEST" in sha256:*) ;; *) echo "invalid server digest: $SERVER_DIGEST" >&2; exit 1 ;; esac
-          printf 'SERVER_TAG=%s\nSERVER_DIGEST=%s\n' "$SERVER_TAG" "$SERVER_DIGEST" >> "$GITHUB_ENV"
+          printf 'SERVER_TAG=%s\nSERVER_DIGEST=%s\nSERVER_REF=%s\n' "$SERVER_TAG" "$SERVER_DIGEST" "$SERVER_REF" >> "$GITHUB_ENV"
       - name: Scan server image (Trivy JSON)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
+          # SERVER_REF is the pushed digest on real runs and the local
+          # rehearsal tag under dry_run.
+          scan-ref: ${{ env.SERVER_REF }}
           version: v0.75.0
           scanners: vuln,secret,misconfig,license
           ignore-unfixed: false
@@ -365,7 +417,7 @@ jobs:
           TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-server@${{ env.SERVER_DIGEST }}
+          scan-ref: ${{ env.SERVER_REF }}
           version: v0.75.0
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
@@ -382,7 +434,8 @@ jobs:
         if: failure() && hashFiles('trivy-mech-server-report.json') != ''
         run: python3 scripts/trivy_gate_summary.py trivy-mech-server-report.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload server Trivy SARIF
-        if: always() && hashFiles('trivy-mech-server.sarif') != ''
+        # A rehearsal must not file code-scanning alerts.
+        if: always() && inputs.dry_run != true && hashFiles('trivy-mech-server.sarif') != ''
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-mech-server.sarif
@@ -398,7 +451,7 @@ jobs:
         run: |
           set -euo pipefail
           uv run python scripts/measure_image_tools.py \
-            --image-ref "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}" \
+            --image-ref "$SERVER_REF" \
             --out "$RUNNER_TEMP/mech-server.json"
       - name: Record published image summary
         env:
@@ -414,7 +467,7 @@ jobs:
             fi
             echo "- **tools digest**: \`$TOOLS_DIGEST\`"
             echo "- **tools tag**: \`$TOOLS_TAG\`"
-            echo "- **server**: \`ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}\`"
+            echo "- **server**: \`$SERVER_REF\`"
             echo "- **server tag**: \`$SERVER_TAG\`"
             echo "- **workflow run**: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -423,6 +476,7 @@ jobs:
         # digests. imagetools create copies the manifest server-side — no
         # re-push — so the provenance and SBOM attestations keep
         # referencing the same digest.
+        if: inputs.dry_run != true
         env:
           SKIP_TOOLS: ${{ inputs.skip_tools }}
         run: |
@@ -438,6 +492,8 @@ jobs:
             --tag "ghcr.io/${IMAGE_OWNER}/mech-server:main-latest-source" \
             "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
       - name: Update digest lock and merge PR
+        # dry_run stops at the summary: no lock PR, no post-merge dispatches.
+        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
           ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
@@ -526,3 +582,16 @@ jobs:
             --title "Update mech image digest lock" --body "$body")
           echo "pin PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
           bash scripts/publish_image_pin_pr.sh "$pr_url" "$branch" "" "ci.yml locked-image-check.yml"
+      - name: Note dry-run skips
+        if: inputs.dry_run
+        run: |
+          {
+            echo "### dry-run rehearsal"
+            echo
+            echo "Built and gated the images without publishing. Skipped:"
+            echo "- registry push of the tools and server image tags"
+            echo "- SARIF uploads to code scanning"
+            echo "- provenance and SBOM attestations"
+            echo "- :latest promotion (tools and server mutable tags)"
+            echo "- digest-lock pull request and post-merge dispatches"
+          } >> "$GITHUB_STEP_SUMMARY"
