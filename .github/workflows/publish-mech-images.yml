@@ -289,10 +289,13 @@ jobs:
           else
             echo "::warning::upstream build.py cache_tags layout changed; building without stable cache tag"
           fi
-      - name: Build and publish server
+      - id: build_server
+        name: Build and publish server
         env:
           SDK_SHA: ${{ github.sha }}
-          CUSTOM_TAGS: latest
+          # No CUSTOM_TAGS: the mutable tags (<sha>-latest-source and
+          # main-latest-source) are promoted after every gate below passes,
+          # so a failed scan never serves a new mutable tag.
         run: |
           set -euo pipefail
           uv run --project "$RUNNER_TEMP/sdk" python \
@@ -302,7 +305,13 @@ jobs:
       - name: Resolve server digest
         run: |
           set -euo pipefail
-          SERVER_TAG="${SOURCE_SHA}-latest-source"
+          SERVER_TAG=$(
+            printf '%s' "${{ steps.build_server.outputs.tags_csv }}" | tr ',' '\n' \
+              | grep -F "ghcr.io/${IMAGE_OWNER}/mech-server:" | head -1)
+          SERVER_TAG="${SERVER_TAG#ghcr.io/${IMAGE_OWNER}/mech-server:}"
+          if [ -z "$SERVER_TAG" ]; then
+            echo "no mech-server tag in build output tags_csv" >&2; exit 1
+          fi
           SERVER_DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest.Digest}}' \
             "ghcr.io/${IMAGE_OWNER}/mech-server:${SERVER_TAG}" | tr -d '"')
           case "$SERVER_DIGEST" in sha256:*) ;; *) echo "invalid server digest: $SERVER_DIGEST" >&2; exit 1 ;; esac
@@ -390,6 +399,8 @@ jobs:
           fi
           docker buildx imagetools create \
             --tag "ghcr.io/${IMAGE_OWNER}/mech-server:latest" \
+            --tag "ghcr.io/${IMAGE_OWNER}/mech-server:${SOURCE_SHA}-latest-source" \
+            --tag "ghcr.io/${IMAGE_OWNER}/mech-server:main-latest-source" \
             "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
       - name: Update digest lock and merge PR
         env:
