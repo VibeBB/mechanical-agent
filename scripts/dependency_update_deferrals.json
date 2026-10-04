@@ -1,13 +1,6 @@
 {
   "deferrals": [
     {
-      "surface": "python-version",
-      "name": "*",
-      "latest": "3.14",
-      "review_by": "2027-04-01",
-      "reason": "Repo targets Python 3.12/3.13 (requires-python >=3.12, CI matrix 3.12/3.13, tools image installs 3.12). 3.14 is pending upstream verification: openhands-sdk support and build123d/OCP wheels for 3.14 are unconfirmed. Re-evaluate when the SDK's supported range covers 3.14."
-    },
-    {
       "surface": "pypi",
       "name": "mcp",
       "latest": "2.3.0",
