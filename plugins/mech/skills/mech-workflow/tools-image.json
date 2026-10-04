@@ -1,11 +1,11 @@
 {
-  "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52512361",
-  "digest": "sha256:f942b278f7460f3d5a9dff20481d97cd00c34f8a749b4802378c5091b463704f",
+  "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52516310",
+  "digest": "sha256:6b6b5939a3885721391ddeca0d4a61577d23bfe72b5166ecb7d299b68efd4036",
   "dockerfile": "docker/mech-tools.Dockerfile",
   "image": "ghcr.io/vibebb/mech-tools",
-  "published_at": "2026-10-04T03:09:58Z",
-  "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52512420",
-  "tag": "1e9661367e3ff950785c38452a9074c6c93a7f93-tools",
+  "published_at": "2026-10-04T03:37:04Z",
+  "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52516344",
+  "tag": "584d5426f79c65e16e480e8729ececb01c5dbd3c-tools",
   "tools": {
     "build123d": "0.13.0",
     "git": "2.47.3",
@@ -13,5 +13,5 @@
     "python": "Python 3.14.8",
     "uv": "0.12.23 (x86_64-unknown-linux-musl)"
   },
-  "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37172452940"
+  "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37174084690"
 }
