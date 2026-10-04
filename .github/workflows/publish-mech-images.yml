@@ -303,10 +303,12 @@ jobs:
             --base-image "$TOOLS_REF" --image "ghcr.io/${IMAGE_OWNER}/mech-server" \
             --target source --platforms linux/amd64 --push --sdk-project-root "$RUNNER_TEMP/sdk"
       - name: Resolve server digest
+        env:
+          BUILD_TAGS_CSV: ${{ steps.build_server.outputs.tags_csv }}
         run: |
           set -euo pipefail
           SERVER_TAG=$(
-            printf '%s' "${{ steps.build_server.outputs.tags_csv }}" | tr ',' '\n' \
+            printf '%s' "$BUILD_TAGS_CSV" | tr ',' '\n' \
               | grep -F "ghcr.io/${IMAGE_OWNER}/mech-server:" | head -1)
           SERVER_TAG="${SERVER_TAG#ghcr.io/${IMAGE_OWNER}/mech-server:}"
           if [ -z "$SERVER_TAG" ]; then
