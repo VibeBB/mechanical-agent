@@ -310,7 +310,8 @@ jobs:
           SERVER_TAG=$(
             printf '%s' "$BUILD_TAGS_CSV" | tr ',' '\n' \
               | grep -F "ghcr.io/${IMAGE_OWNER}/mech-server:" | head -1)
-          SERVER_TAG="${SERVER_TAG#ghcr.io/${IMAGE_OWNER}/mech-server:}"
+          server_repo="ghcr.io/${IMAGE_OWNER}/mech-server:"
+          SERVER_TAG="${SERVER_TAG#"$server_repo"}"
           if [ -z "$SERVER_TAG" ]; then
             echo "no mech-server tag in build output tags_csv" >&2; exit 1
           fi
