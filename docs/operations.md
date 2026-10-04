@@ -184,7 +184,18 @@ or opening the bump PR; `verify`, `install-smoke`, and the zip build run
 on that SHA; the tag and `gh release create` steps are skipped. Use it to
 exercise the pipeline before the first real release — the version-bump
 fallback-PR path is the one piece a dry run still cannot reach (it ends in
-a merge to main).
+a merge to main). The bump-version state machine — version resolution,
+tag check, direct push, and the self-approving + dispatched-checks +
+auto-merge fallback PR — lives in `scripts/release_bump.sh` (the workflow
+step is a thin wrapper) and is covered by `tests/test_release_bump.py`
+(stubbed `gh`, local git remotes).
+
+`publish-mech-images.yml` accepts a `dry_run` dispatch input that rehearses
+the publish: the tools and server images build into the local daemon and
+the Trivy gates, SBOM chain, measurements, and smoke checks still run
+against them, but nothing is pushed, promoted (`:latest` and the mutable
+`-latest-source` tags), attested, locked, or dispatched, and no SARIF
+reaches code scanning. The run summary lists every skipped step.
 
 ## Dependency updates
 
