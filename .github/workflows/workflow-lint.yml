@@ -13,7 +13,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: workflow-lint-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pull_request runs are cancelled; main pushes and dispatched
+  # runs are never cancelled so in-flight main verification always lands.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
