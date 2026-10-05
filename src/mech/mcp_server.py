@@ -23,6 +23,15 @@ from mcp.server.stdio import stdio_server
 
 from . import __version__
 from .doctor import run_doctor
+from .records import (
+    DecisionInput,
+    StageImpressionInput,
+    VisionReviewInput,
+    record_decision,
+    record_impression,
+    record_vision_review,
+    records_summary,
+)
 from .standards import (
     BEARING_SEATS,
     ISO_METRIC_THREADS,
@@ -126,6 +135,65 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["dxf_path"],
         "additionalProperties": False,
     },
+    "mech_render_views": {
+        "type": "object",
+        "properties": {
+            "step": {"type": "string"},
+            "baseline_path": {"type": "string"},
+        },
+        "required": ["step"],
+        "additionalProperties": False,
+    },
+    "mech_record_decision": DecisionInput.model_json_schema(),
+    "mech_record_impression": StageImpressionInput.model_json_schema(),
+    "mech_record_vision_review": VisionReviewInput.model_json_schema(),
+    "mech_records_status": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    "mech_ux_inbox": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    "mech_ux_respond": {
+        "type": "object",
+        "properties": {
+            "request": {"type": "string"},
+            "status": {
+                "type": "string",
+                "enum": [
+                    "accepted",
+                    "in_progress",
+                    "done",
+                    "rejected",
+                    "deferred",
+                    "needs_info",
+                ],
+            },
+            "reason": {"type": "string"},
+            "artifacts": {"type": "array", "items": {"type": "string"}},
+            "gate_verdicts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "gate": {"type": "string"},
+                        "verdict": {"type": "string", "enum": ["pass", "fail", "unknown"]},
+                    },
+                    "required": ["gate", "verdict"],
+                    "additionalProperties": False,
+                },
+            },
+            "design_reports": {"type": "array", "items": {"type": "string"}},
+            "decision_refs": {"type": "array", "items": {"type": "string"}},
+            "impression_refs": {"type": "array", "items": {"type": "string"}},
+            "questions_for_user": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["request", "status"],
+        "additionalProperties": False,
+    },
 }
 
 _DESCRIPTIONS = {
@@ -143,6 +211,41 @@ _DESCRIPTIONS = {
     "mech_render": (
         "Rasterize an exported DXF to PNG for the advisory vision lane; "
         "optional sha256 visual baseline compare."
+    ),
+    "mech_render_views": (
+        "Project a STEP file into a 2x2 views sheet (front/top/right/isometric, "
+        "hidden lines dashed) and return the PNG inline for visual review; "
+        "optional envelope-anchor overlay and sha256 baseline."
+    ),
+    "mech_record_decision": (
+        "Record a design decision (VibeBB Record Protocol): first principles, at least two "
+        "options with pros/cons, the chosen option, a rationale of 200+ chars, evidence "
+        "paths (hashed) or references, assumptions, unknowns, risks, revisit trigger. "
+        "Record one for every non-trivial choice without being asked."
+    ),
+    "mech_record_impression": (
+        "Record the long-form impression that closes a stage (400+ chars, 3+ sentences): "
+        "what you noticed, what works, what worries you, how a maker or user would read "
+        "it, what to do next. Binds the stage artifacts by sha256; record it after the "
+        "final regeneration."
+    ),
+    "mech_record_vision_review": (
+        "Record what you thought after looking at an image (400+ char impression plus "
+        "findings). Bind it to image_path (hashed) or to the source_event_id of an "
+        "inspect_image_with_vision event. Required for every image you viewed."
+    ),
+    "mech_records_status": (
+        "Counts of decision / impression / vision-review records and the last Stop-hook "
+        "verdict listing records this session still owes."
+    ),
+    "mech_ux_inbox": (
+        "List UX-creator liaison requests targeting mech (SLP v2): per-request state "
+        "new|answered|stale|blocked plus malformed request/response files."
+    ),
+    "mech_ux_respond": (
+        "Write liaison/<id>.ux-response.json answering a UX-creator request (SLP v2). "
+        "'done' needs all-pass gate verdicts, artifacts, and decision/impression refs "
+        "into the VRP logs; use needs_info or rejected with a reason otherwise."
     ),
 }
 
@@ -252,6 +355,22 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     try:
         if name == "mech_doctor":
             return _ok(run_doctor())
+        if name == "mech_record_decision":
+            return _ok(record_decision(arguments))
+        if name == "mech_record_impression":
+            return _ok(record_impression(arguments))
+        if name == "mech_record_vision_review":
+            return _ok(record_vision_review(arguments))
+        if name == "mech_records_status":
+            return _ok(records_summary())
+        if name == "mech_ux_inbox":
+            from .liaison import ux_inbox
+
+            return _ok(ux_inbox())
+        if name == "mech_ux_respond":
+            from .liaison import ux_respond
+
+            return _ok(ux_respond(dict(arguments)))
         if name == "mech_standards":
             return _ok(_standards_payload(arguments["kind"]))
         if name == "mech_fit_lookup":
@@ -352,6 +471,35 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             if image is not None:
                 content.append(image)
             return types.CallToolResult(content=content)
+        if name == "mech_render_views":
+            from .views import render_views
+
+            step_path = _path_arg(arguments, "step")
+            baseline_path = _optional_path_arg(arguments, "baseline_path")
+            if baseline_path is not None:
+                reject_symlinks(baseline_path)
+            views = render_views(step_path, baseline_path=baseline_path)
+            payload = {
+                "verdict": "pass",
+                "step_path": views.step_path,
+                "svg_path": views.svg_path,
+                "png_path": views.png_path,
+                "image_sha256": views.image_sha256,
+                "views": list(views.views),
+            }
+            if views.baseline is not None:
+                payload["baseline"] = views.baseline
+                payload["baseline_sha256"] = views.baseline_sha256
+            content = [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                )
+            ]
+            image = _image_content(Path(views.png_path))
+            if image is not None:
+                content.append(image)
+            return types.CallToolResult(content=content)
         return _error(f"unknown mech tool: {name}")
     except Exception as exc:  # fail-closed transport boundary
         return _error(str(exc))
@@ -378,6 +526,13 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_export_envelope": _anno("Export envelope contract", write=True),
     "mech_dxf_lint": _anno("DXF lint", write=False),
     "mech_render": _anno("Render DXF to PNG", write=True),
+    "mech_render_views": _anno("Render STEP views sheet", write=True),
+    "mech_record_decision": _anno("Record decision", write=True),
+    "mech_record_impression": _anno("Record stage impression", write=True),
+    "mech_record_vision_review": _anno("Record vision review", write=True),
+    "mech_records_status": _anno("Records status", write=False),
+    "mech_ux_inbox": _anno("Liaison inbox", write=False),
+    "mech_ux_respond": _anno("Answer liaison request", write=True),
 }
 
 

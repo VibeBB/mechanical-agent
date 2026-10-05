@@ -204,7 +204,17 @@ def test_mcp_export_envelope_accepts_relative_workspace_path(
 def test_mcp_tool_annotations():
     from mech.mcp_server import tool_specs
 
-    write_tools = {"mech_author", "mech_gates", "mech_export_envelope", "mech_render"}
+    write_tools = {
+        "mech_author",
+        "mech_gates",
+        "mech_export_envelope",
+        "mech_render",
+        "mech_render_views",
+        "mech_record_decision",
+        "mech_record_impression",
+        "mech_record_vision_review",
+        "mech_ux_respond",
+    }
     tools = tool_specs()
     assert {tool.name for tool in tools} == {
         "mech_doctor",
@@ -217,6 +227,13 @@ def test_mcp_tool_annotations():
         "mech_export_envelope",
         "mech_dxf_lint",
         "mech_render",
+        "mech_render_views",
+        "mech_record_decision",
+        "mech_record_impression",
+        "mech_record_vision_review",
+        "mech_records_status",
+        "mech_ux_inbox",
+        "mech_ux_respond",
     }
     for tool in tools:
         annotations = tool.annotations

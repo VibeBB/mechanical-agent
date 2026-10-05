@@ -29,8 +29,17 @@ ARTIFACT_SUFFIXES = (
     ".dxf_lint.json",
     ".svg",
     ".png",
+    ".ux-response.json",
 )
-ARTIFACT_NAMES = ("manifest.json", "provenance.json", "design-report.json")
+ARTIFACT_NAMES = (
+    "decisions.jsonl",
+    "impressions.jsonl",
+    "vision-reviews.jsonl",
+    "records-status.json",
+    "manifest.json",
+    "provenance.json",
+    "design-report.json",
+)
 WRITE_TOOLS = {"file_editor", "apply_patch"}
 VIEW_ACTIONS = {"view", "read", "undo_edit"}
 WRITE_ACTIONS = {"create", "str_replace", "insert", "edit", "write"}
@@ -210,9 +219,10 @@ def main() -> int:
     if _is_artifact_write(payload):
         print(
             "generated artifacts (.step/.stl/.3mf/.dxf/.svg/.png,"
-            " design-report.json) are projections of the brief; regenerate"
-            " them via mech_author / mech_render or `python -m mech"
-            " author|render`, never edit them directly",
+            " design-report.json, VRP logs, *.ux-response.json) are"
+            " projections of the brief or typed writers; regenerate them"
+            " via mech_author / mech_render / mech_ux_respond or `python -m mech"
+            " author|render|record|ux`, never edit them directly",
             file=sys.stderr,
         )
         return 2

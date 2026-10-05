@@ -34,7 +34,7 @@ from _provenance import (
 
 EVENTS_ENV = "MECH_IMAGE_OBSERVATIONS"
 EVENTS_RELATIVE_PATH = Path("observations/mech/image-observations.jsonl")
-OBSERVED_TOOLS = {"mech_render", "file_editor"}
+OBSERVED_TOOLS = {"mech_render", "mech_render_views", "file_editor"}
 
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
 _IMAGE_PATH = re.compile(r"[^\s\"'<>]+?\.(?:png|jpe?g)", re.IGNORECASE)

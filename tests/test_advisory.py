@@ -17,7 +17,11 @@ LONG_IMPRESSION = (
     "The sheet reads like a buildable drawing: the outline is dimensioned off a "
     "declared datum, the hole table anchors every bore without ambiguity, and the "
     "title block carries the scale and tolerance a fabricator needs. What it still "
-    "leaves unsaid is the vent-slot pitch, which has to be inferred rather than read."
+    "leaves unsaid is the vent-slot pitch, which has to be inferred rather than read. "
+    "A machinist picking it up cold would know where to clamp, which face is the "
+    "datum, and which bore sets the fit. The remaining doubt is whether the section "
+    "callout survives a low-resolution print, so the next step is a draft-quality "
+    "render check."
 )
 
 

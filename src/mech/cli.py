@@ -7,7 +7,12 @@ Subcommands:
   export          generate parts and export artifacts without gates
   gates           regenerate the design and re-run all gates on existing artifacts
   render          rasterize an exported DXF to PNG for the advisory vision lane
+  render-views    project a STEP file to a 2x2 views sheet (SVG + PNG)
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
+  review-record   write a validated visual-review advisory JSON for an image
+  record          append a VibeBB Record Protocol record (decision, impression,
+                  vision-review) or print the records status
+  ux              list or answer UX-creator liaison requests (SLP v2)
 
 All commands print a JSON verdict to stdout; the verdict is fail-closed.
 """
@@ -50,7 +55,13 @@ def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
     out_path = Path(args.out)
     try:
         brief = load_brief(Path(args.brief))
-        write_envelope(brief, out_path)
+        provenance = write_envelope(
+            brief,
+            out_path,
+            brief_path=Path(args.brief),
+            design_report_path=Path(args.design_report) if args.design_report else None,
+            decision_refs=list(args.decision_ref or []),
+        )
     except Exception as exc:
         return {"verdict": "fail", "stage": "export-envelope", "detail": str(exc)}
     return {
@@ -58,6 +69,8 @@ def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
         "design": brief.name,
         "anchors": [anchor.name for anchor in brief.harness_anchors],
         "out": str(out_path),
+        "envelope_sha256": provenance["envelope_sha256"],
+        "provenance": str(out_path.with_suffix(".provenance.json")),
     }
 
 
@@ -182,7 +195,83 @@ def _cmd_review_record(args: argparse.Namespace) -> dict[str, Any]:
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {"verdict": "fail", "stage": "review-record", "detail": str(exc)}
-    return {"verdict": "pass", "record": str(path)}
+    return {"verdict": "pass", "record": str(path), "vision_log": _log_vision_review(path)}
+
+
+def _log_vision_review(advisory_path: Path) -> str:
+    """Mirror the advisory into the VRP vision-review log when the image is in the workspace."""
+    from .records import record_vision_review
+
+    detail = json.loads(advisory_path.read_text(encoding="utf-8"))["detail"]
+    try:
+        logged = record_vision_review(
+            {
+                "image_path": detail["image_path"],
+                "model": detail["model"],
+                "checklist": detail["checklist"].replace("_", "-"),
+                "findings": [
+                    {"category": f["category"], "severity": f["severity"], "note": f["note"]}
+                    for f in detail["findings"]
+                ],
+                "impression": detail["impression"],
+            }
+        )
+    except ValueError as exc:
+        return f"skipped: {exc}"
+    return str(logged["path"])
+
+
+def _cmd_record(args: argparse.Namespace) -> dict[str, Any]:
+    from pydantic import ValidationError
+
+    from .records import RECORDERS, records_summary
+
+    if args.kind == "status":
+        return records_summary()
+    try:
+        raw: Any = json.loads(Path(args.json).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("record JSON must be an object")
+        return RECORDERS[args.kind](cast(dict[str, Any], raw))
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        return {"verdict": "fail", "stage": "record", "detail": str(exc)}
+
+
+def _cmd_render_views(args: argparse.Namespace) -> dict[str, Any]:
+    from .views import render_views
+
+    result = render_views(
+        Path(args.step),
+        baseline_path=Path(args.baseline) if args.baseline else None,
+    )
+    payload: dict[str, Any] = {
+        "verdict": "pass",
+        "step_path": result.step_path,
+        "svg_path": result.svg_path,
+        "png_path": result.png_path,
+        "image_sha256": result.image_sha256,
+        "views": list(result.views),
+    }
+    if result.baseline is not None:
+        payload["baseline"] = result.baseline
+        payload["baseline_sha256"] = result.baseline_sha256
+    return payload
+
+
+def _cmd_ux(args: argparse.Namespace) -> dict[str, Any]:
+    from pydantic import ValidationError
+
+    from .liaison import ux_inbox, ux_respond
+
+    if args.ux_command == "inbox":
+        return ux_inbox()
+    try:
+        raw: Any = json.loads(Path(args.json).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("response JSON must be an object")
+        return ux_respond(cast(dict[str, Any], raw))
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        return {"verdict": "fail", "stage": "ux", "detail": str(exc)}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -241,6 +330,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     envelope_p.add_argument("--brief", required=True)
     envelope_p.add_argument("--out", required=True)
+    envelope_p.add_argument(
+        "--design-report",
+        default=None,
+        help="design-report.json to bind into the envelope provenance sidecar",
+    )
+    envelope_p.add_argument(
+        "--decision-ref",
+        action="append",
+        default=None,
+        help="event_id in observations/mech/decisions.jsonl (repeatable)",
+    )
+
+    views_p = sub.add_parser(
+        "render-views",
+        help="project a STEP file into a 2x2 views sheet (SVG + PNG)",
+    )
+    views_p.add_argument("--step", required=True, help="STEP file to project")
+    views_p.add_argument(
+        "--baseline",
+        default=None,
+        help="optional baseline JSON: recorded when missing, compared when present",
+    )
 
     review_p = sub.add_parser(
         "review-record",
@@ -251,7 +362,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_p.add_argument(
         "--checklist",
         required=True,
-        choices=["dxf_outline", "part_render", "intake_image"],
+        choices=["dxf_outline", "part_render", "assembly_render", "intake_image"],
     )
     review_p.add_argument("--summary", default=None)
     review_p.add_argument("--out", default=None)
@@ -267,12 +378,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON file: list of {category, severity, note, bbox?}",
     )
 
+    record_p = sub.add_parser("record", help="append a VibeBB Record Protocol record")
+    record_p.add_argument("kind", choices=["decision", "impression", "vision-review", "status"])
+    record_p.add_argument("--json", default=None, help="JSON object file with the record fields")
+
+    ux_p = sub.add_parser("ux", help="UX-creator liaison inbox / respond (SLP v2)")
+    ux_sub = ux_p.add_subparsers(dest="ux_command", required=True)
+    ux_sub.add_parser("inbox", help="list liaison requests targeting mech")
+    ux_respond_p = ux_sub.add_parser("respond", help="answer a liaison request")
+    ux_respond_p.add_argument("--json", required=True, help="response payload JSON file")
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "record" and args.kind != "status" and not args.json:
+        parser.error("record decision|impression|vision-review requires --json")
     if args.command == "doctor":
         return _emit_doctor(args)
     handlers = {
@@ -284,7 +407,10 @@ def main(argv: list[str] | None = None) -> int:
         "gates": _cmd_gates,
         "dxf-lint": _cmd_dxf_lint,
         "render": _cmd_render,
+        "render-views": _cmd_render_views,
         "review-record": _cmd_review_record,
+        "record": _cmd_record,
+        "ux": _cmd_ux,
     }
     handler = handlers[args.command]
     try:
