@@ -2,6 +2,7 @@
 
 # ezdxf's annotations are only partially typed.
 # pyright: reportPrivateImportUsage=false
+# pyright: reportPrivateUsage=false
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownVariableType=false
 # pyright: reportUnknownArgumentType=false
@@ -483,7 +484,7 @@ def test_screen_basis_matches_project_to_viewport() -> None:
 def test_lines_bbox() -> None:
     from mech.views import _lines_bbox
 
-    assert _lines_bbox([[(1.0, 2.0), (3.0, 4.0)], [[-1.0, 5.0]]]) == (
+    assert _lines_bbox([[(1.0, 2.0), (3.0, 4.0)], [(-1.0, 5.0)]]) == (
         -1.0,
         3.0,
         2.0,
