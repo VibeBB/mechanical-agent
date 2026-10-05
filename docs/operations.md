@@ -31,6 +31,19 @@ minimum. pytest runs `-n auto --dist loadgroup` by default; `-n 0` for
 single-test debugging. Keep collection counts, verdicts, and normalized hashes
 identical between parallel and sequential runs.
 
+### Partial runs
+
+`--list` dumps each stage's commands as JSON; `--group` (`lint`, `unit`),
+`--match <substr>`, and `--shard K/N` select a subset of a stage:
+
+```bash
+uv run python scripts/verify_all.py --stage fast --group lint
+uv run python scripts/verify_all.py --stage fast --match test_gates
+```
+
+CI uses the same flags for its matrix legs, so a local partial run reproduces
+a failing check exactly. Run the full `fast` stage before submitting.
+
 ## Local end-to-end check
 
 ```bash
