@@ -25,7 +25,7 @@ import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -347,3 +347,28 @@ def records_summary(root: Path | None = None) -> dict[str, Any]:
         except json.JSONDecodeError:
             status = {"verdict": "fail", "problems": ["records-status.json is malformed"]}
     return {"verdict": "pass", "records_dir": str(directory), "counts": counts, "last_stop": status}
+
+
+def event_ids(log: Path) -> set[str]:
+    """event_id values in a VRP JSONL log; unreadable lines are skipped.
+
+    Mech-local addition (not in the wire-agent original): shared reader
+    for liaison/envelope ref validation.
+    """
+    ids: set[str] = set()
+    if not log.is_file():
+        return ids
+    for line in log.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            value: Any = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, dict):
+            continue
+        record = cast(dict[str, Any], value)
+        event_id = record.get("event_id")
+        if isinstance(event_id, str):
+            ids.add(event_id)
+    return ids

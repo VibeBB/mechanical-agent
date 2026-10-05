@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from .brief import DesignBrief
 from .records import sha256_file
@@ -40,24 +40,11 @@ def _validate_decision_refs(decision_refs: list[str], brief_path: Path | None) -
     """Each ref must be an event_id line in observations/mech/decisions.jsonl."""
     if not decision_refs:
         return []
-    from .records import RECORDS_DIR
+    from .records import RECORDS_DIR, event_ids
     from .workspace import workspace_root
 
     log = workspace_root() / RECORDS_DIR / "decisions.jsonl"
-    known: set[str] = set()
-    if log.is_file():
-        for line in log.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                value: Any = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(value, dict):
-                continue
-            record = cast(dict[str, Any], value)
-            if isinstance(record.get("event_id"), str):
-                known.add(record["event_id"])
+    known = event_ids(log)
     missing = [ref for ref in decision_refs if ref not in known]
     if missing:
         raise ValueError(f"decision_ref not found in {log.name}: {', '.join(missing)}")
@@ -96,6 +83,26 @@ def write_envelope(
         provenance["brief_sha256"] = sha256_file(brief_path)
     if report_path is not None:
         provenance["design_report_sha256"] = sha256_file(report_path)
+    # Anchor frame provenance: harness_anchor position_mm values are
+    # declared relative to the assembly bbox minimum corner. When the
+    # assembly STEP (<brief name>.step, written by author/export into the
+    # same out dir) is available, record the frame plus the STEP-space
+    # offset so consumers (wire, the render-views overlay) can map anchor
+    # -> STEP coordinates as anchor + offset. Regenerating the design here
+    # would be far costlier than reading the artifact that was just
+    # exported; the file is the cheaper deterministic route.
+    assembly_step = out_path.parent / f"{brief.name}.step"
+    if assembly_step.is_file():
+        try:
+            from build123d import import_step  # pyright: ignore[reportUnknownVariableType]
+
+            bbox = import_step(assembly_step).bounding_box()  # pyright: ignore[reportUnknownVariableType]
+            provenance["anchor_frame"] = "assembly-bbox-min-corner"
+            provenance["step_frame_offset_mm"] = [
+                round(float(v), 4) for v in (bbox.min.X, bbox.min.Y, bbox.min.Z)
+            ]
+        except Exception as exc:
+            raise ValueError(f"cannot read assembly STEP {assembly_step}: {exc}") from exc
     refs = _validate_decision_refs(list(decision_refs or []), brief_path)
     if refs:
         provenance["decision_refs"] = refs

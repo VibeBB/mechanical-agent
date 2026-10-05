@@ -55,6 +55,21 @@ or `。`/`！`/`？`) and ≥ 3 distinct sentences. The same rule applies to
 ## Vision points (every image gets a `vision_review`)
 
 - intake images (user sketches/photos) — `intake_image` checklist;
+Every image the model looks at needs a `vision_review` record; the
+sheet below lists each vision point, who reviews it, the checklist
+value, and when:
+
+| Vision point | Produced by | Reviewed by | Checklist | When |
+| --- | --- | --- | --- | --- |
+| Intake images (photos, sketches) | user attachments / `intake-attachments` hook | mech-brief | `intake_image` | at intake, before writing A*/Q* |
+| DXF renders (`*.dxf` → `.png`) | `render_dxf` / author-time renders | mech-review (every one); mech-design for its own exports | `dxf_outline` | after export/author, before review sign-off |
+| Part views sheets (`<part>.views.png`) | `render_views` / author-time renders | mech-review (every one) | `part_render` | after export/author |
+| Assembly views sheet (`<name>.views.png`) | `render_views`; `mech_author` returns it inline | mech-design (self-check before handoff) and mech-review | `assembly_render` | after `verdict: pass` |
+| Envelope anchor overlay | `render_views --envelope <name>.envelope.json` (marks per anchor, in all four views) | mech-design / mech-review | `assembly_render` | when anchors exist and the provenance sidecar was written |
+
+Every `vision_review` impression judges geometric accuracy, ambiguity,
+design intent, usefulness to maker/user, and the next step —
+
 - `*.views.png` STEP views sheets — `part_render` (one part) or
   `assembly_render` (the assembly);
 - DXF→PNG drawing renders — `dxf_outline`;

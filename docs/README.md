@@ -2,7 +2,7 @@
 
 ## Guides
 
-- [architecture.md](architecture.md) — system structure, data flow, gate model, module reference
+- [architecture.md](architecture.md) — system structure, data flow, gate model, module reference — see also [reference.md](reference.md) for the per-module API index
 - [workflow.md](workflow.md) — the conversational design workflow: stages, handoffs, records left
 - [agents.md](agents.md) — the three task sub-agents and their contracts
 - [skills.md](skills.md) — every SKILL.md and when it triggers

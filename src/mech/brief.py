@@ -363,15 +363,25 @@ class HarnessAnchor(BaseModel):
     """A fixturing point exported to wire-agent as an envelope anchor.
 
     `kind` names the seat type (clip, grommet, breakout, other);
-    `position_mm` is the anchor's location in the design coordinate
-    frame when known.
+    `position_mm` is the anchor's location measured from the minimum
+    corner of the generated assembly's axis-aligned bounding box — x
+    along width, y along depth, z up — the same lower-left convention
+    the DXF hole tables use ("HOLE X/Y FROM LOWER-LEFT EDGE"). The
+    `harness_anchor.within_envelope` gate checks declared positions land
+    inside the assembly envelope.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
     kind: Literal["clip", "grommet", "breakout", "other"] = "other"
-    position_mm: tuple[float, float, float] | None = None
+    position_mm: tuple[float, float, float] | None = Field(
+        default=None,
+        description=(
+            "anchor position relative to the minimum corner of the assembly "
+            "bounding box (x=width, y=depth, z up), when known"
+        ),
+    )
 
 
 class DesignBrief(BaseModel):

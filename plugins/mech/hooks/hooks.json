@@ -99,7 +99,7 @@
       ]
     },
     {
-      "matcher": "file_editor|mech_render|mech_render_views",
+      "matcher": "file_editor|mech_render|mech_render_views|mech_author",
       "hooks": [
         {
           "type": "command",

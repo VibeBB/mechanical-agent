@@ -59,9 +59,10 @@ cannot pass with the current requirements — then hand that back to the orchest
 instead of weakening a limit. Never edit `.step/.stl/.3mf/.dxf`, `manifest.json`,
 `provenance.json`, or `design-report.json` directly; they are projections of the brief.
 Once `verdict` is `pass`, render the assembly views sheet for every
-exported `.step` (`mech_render_views` or `python3
-"$MECH_PLUGIN/scripts/mech_launcher.py" render-views --step <file> --
-envelope <name>.envelope.json`), look at the PNG, and record a
+exported `.step` (`mech_render_views`, or `python3
+"$MECH_PLUGIN/scripts/mech_launcher.py" render-views --step <file>
+--envelope <name>.envelope.json` to draw the harness anchors from the
+envelope sidecar), look at the PNG, and record a
 `mech_record_vision_review` self-check against `assembly_render`: does
 the geometry read as designed, is anything ambiguous, does the design
 intent come across, would a maker act on it, and what is the next step.

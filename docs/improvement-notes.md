@@ -32,17 +32,37 @@ problem, evidence, done / not-done and why.
   `rasterize_svg`, `sha256_file`, `record_or_compare_baseline`, reused by
   `views.py` instead of duplicating.
 
+- **Top view was mirrored** (`up=(0,-1,0)` → vent rendered on the
+  wrong edge). Fixed to `up=(0,1,0)` and the sheet rearranged to true
+  third-angle ([top, isometric] over [front, right]) with a footer
+  naming the projection, file, and overall dims; each view is centered
+  in its cell. Verified by `test_view_orientations`.
+- **Anchor frame bug (cross-plugin).** Envelope `position_mm` values
+  were undeclared-frame — they turned out to be design-frame
+  (assembly-bbox min corner, like the DXF lower-left tables), not STEP
+  coordinates. Now defined in `brief.py`, gated by
+  `harness_anchor.within_envelope` (`[-1, size+1]` mm per axis), and the
+  provenance sidecar carries `anchor_frame` +
+  `step_frame_offset_mm` so the overlay draws them correctly
+  (`test_envelope_anchors_land_in_assembly_bbox`).
+- **Author-time renders** (`author --no-render` / `mech_author render:
+  false` to skip): every DXF + a views sheet per STEP is produced after
+  gates, listed in `design-report` under `renders`, and the assembly
+  sheet is returned inline by the MCP tool. L2 only — a render error is
+  reported, never a verdict change. `mech_author` added to the
+  image-observation matcher.
+- **Liaison correctness vs the UX producer** (`requests.py`):
+  `created_at`/`responded_at` must be tz-aware ISO-8601, list items must
+  be non-empty, high-risk needs a 20+ char rationale containing a
+  job-id-shaped token (membership stays UX-side), inbox entries carry
+  `reasons` (input changed/missing, response hash drift, unanswered
+  deps, cycle path, malformed response).
+- **Author renders coexistence**: verified `gates` on an authored+rendered
+  dir still passes — renders are not manifest entries
+  (`test_cli_author_renders_and_gates_rerun`).
+
 ## Findings / not done (and why)
 
-- **Envelope anchors do not share the assembly STEP frame.** Hypothesis
-  test: example anchors `(60,0,20)` and `(40,55,10)` lie outside the
-  assembly bbox `(-40..40, -30..30, 0..30)` — they fit a corner-origin
-  reading `(0..80, 0..60, 0..30)` instead. The anchor overlay in
-  `render_views` was dropped per the brief; tracked in
-  `tests/test_render.py::test_envelope_anchors_not_in_step_frame`.
-  Follow-up: decide whether `position_mm` is corner-origin design-frame
-  (worth documenting in `brief.py`) and only then consider re-adding an
-  overlay with the translation derived from the part frame.
 - **README sister list.** Old README listed only 4 of 11 sisters; the new
   README names all eleven (UX-creator, bard, dashboard, document,
   electrical-circuit, firmware, fpga, mechanical,
@@ -58,3 +78,30 @@ problem, evidence, done / not-done and why.
   `records-status.json` keeps only the last verdict; a rolling history
   could help debugging but would add a non-canonical file name the
   shared hook does not write. Left as-is (shared files are byte-locked).
+- **`living_hinge` and `detent` have rules but no geometry** —
+  `generators/__init__.py` dispatches only enclosure/bracket/spur_gear
+  bodies; mechanism features snap/rib/boss attach, hinge/detent are
+  parametric-only (see architecture.md). Needs a generator + DXF/export
+  path before they're designable.
+- **No FEA / physics validation anywhere** — gates are geometric and
+  rule-table only (kernel validity, reload, mesh, interference, wall
+  thickness, DFM/fits/stackups, anchors). Thermal, drop, fatigue,
+  fastener-torque, and mold-flow are out of scope by design; simulation
+  results would arrive via the simulation sister's artifacts.
+- **Single-board enclosures** — `EnclosureSpec.board` is singular; no
+  daughterboard/flex/connector-frame modeling. Multi-board needs a
+  spec change and an interference path for board-board clearance.
+- **`depends_on` only inspects the liaison dir** — requests pinned to
+  files outside the workspace are reported `input outside workspace`
+  (stale), which is correct fail-closed behavior but means UX must
+  stage inputs inside the workspace.
+- **Anchor tolerance is fixed at ±1 mm** in
+  `harness_anchor.within_envelope`; a per-process anchor tolerance would
+  need a brief field.
+- **High-risk job-id validation is shape-only on this side** — mech
+  checks for a 20+ char rationale containing a job-id token; real
+  membership vs the UX contract is UX-creator's check (documented in
+  `liaison.py`).
+- **`project_to_viewport` self-occlusion quality** — the hidden-line
+  split is OCCT's; dense geometry (vent grids) produces many short
+  dashed polylines. Fine for review, not a drawing-quality HLR package.

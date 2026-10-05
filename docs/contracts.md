@@ -15,7 +15,13 @@ openings, vents), `bracket` (`BracketSpec`: legs, thickness, holes,
 gusset), `spur_gear` (`SpurGearSpec`: module, teeth, face width, bore,
 helix); plus `fits[]`, `stackups[]`, `mechanism_features[]`,
 `harness_anchors[]` (`{name, kind: clip|grommet|breakout|other,
-position_mm?}`).
+position_mm?}`). `position_mm` is measured from the **minimum corner of
+the generated assembly's axis-aligned bounding box** (x = width, y =
+depth, z up) — the same lower-left convention the DXF hole tables use.
+The `harness_anchor.within_envelope` gate check (`{id, subject,
+status, measured, limit, detail}` shape) passes when every coordinate
+lies within [-1, size+1] mm of the assembly bbox in that frame; anchors
+without `position_mm` produce no check.
 
 ### `*.intake.json` — `src/mech/intake.py::Intake`
 
@@ -33,7 +39,12 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
 - `provenance.json` — license + `brief_sha256` + tool versions.
 - `design-report.json` / `design-report.md` — `{schema_version: 1,
   verdict, checks: [{id, subject, status, measured, limit, detail}],
-  summary}` (`src/mech/gates.py::GateReport`, `report.py`).
+  summary, parts, references, provenance}` (`src/mech/gates.py::GateReport`,
+  `report.py`). When author renders ran: `renders: {status: "ok", files:
+  [{kind: dxf|views, source, png_path, image_sha256}]}` (or `{status:
+  "error", detail}`); the markdown gets an advisory "Renders (advisory —
+  review each)" section. Render entries are L2 advisory — they never
+  change `verdict`.
 - `*.advisory.json` — `src/mech/advisory.py::AdvisoryResult` `{tool,
   stage, status, summary, artifacts, detail}`; `vision_review` detail =
   `VisualReviewDetail` `{image_path, image_sha256, model, checklist,
@@ -46,8 +57,14 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   system: "mech", anchors: [{name, kind, position_mm?}]}` (unchanged —
   wire validates strict).
 - `*.envelope.provenance.json` — `{schema_version: 1, system: "mech",
-  envelope_sha256, brief_path, brief_sha256, design_report_sha256?,
-  decision_refs?}`.
+  envelope_sha256, brief_path?, brief_sha256?, design_report_sha256?,
+  decision_refs?, anchor_frame: "assembly-bbox-min-corner"?,
+  step_frame_offset_mm: [x,y,z]?}` — the frame fields are present when
+  the assembly STEP (`<brief name>.step` beside the envelope, written by
+  author/export) could be read: `step_frame_offset_mm` is the assembly
+  bbox minimum in STEP coordinates, so STEP point = anchor
+  `position_mm` + offset. The `mech_render_views`/`render-views
+  --envelope` overlay requires them and fails closed without them.
 
 ## VRP records — `src/mech/records.py`
 

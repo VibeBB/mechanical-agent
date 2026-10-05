@@ -41,3 +41,16 @@ Generated PNGs live outside the repo (scratch dir): the views sheets add
   (`ProcessPoolExecutor` spawn); parallelism must not change artifacts,
   hashes, or verdicts.
 - Coverage gate: pytest measures `src/mech` at ≥ 83% lines (fast stage).
+
+
+## Author timing (example enclosure, this branch)
+
+| Command | Wall time |
+| --- | --- |
+| `python -m mech author --brief examples/enclosure.brief.json --no-render` | ~3.1 s |
+| same with renders (default) | ~4.7 s |
+
+Renders add ~1.5 s (four DXF rasterizations + four `project_to_viewport`
+sheets). Render failures never change the gate verdict — they land in
+`renders: {status: "error", detail}` and must be fixed before the stage
+impression.

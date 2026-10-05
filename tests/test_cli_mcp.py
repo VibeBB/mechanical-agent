@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -243,3 +243,74 @@ def test_mcp_tool_annotations():
         assert annotations.destructiveHint is (tool.name in write_tools)
         assert annotations.idempotentHint is True
         assert annotations.openWorldHint is False
+
+
+def test_cli_author_renders_and_gates_rerun(
+    brief_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Author-time renders are L2: listed in JSON+report, never in the
+    manifest, and a gates re-run on the rendered dir still passes."""
+    import shutil
+
+    if shutil.which("rsvg-convert") is None:
+        pytest.skip("rsvg-convert not installed")
+    import json
+
+    out_dir = tmp_path / "out"
+    rc = main(["author", "--brief", str(brief_path), "--out", str(out_dir)])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["verdict"] == "pass"
+    renders = cast(list[dict[str, Any]], payload["renders"])
+    assert isinstance(renders, list) and renders
+    assert {r["kind"] for r in renders} == {"dxf", "views"}
+    for entry in renders:
+        assert Path(entry["png_path"]).is_file()
+        assert len(entry["image_sha256"]) == 64
+    report = json.loads((out_dir / "design-report.json").read_text(encoding="utf-8"))
+    assert report["renders"]["status"] == "ok"
+    md = (out_dir / "design-report.md").read_text(encoding="utf-8")
+    assert "Renders (advisory" in md
+    # extra PNG/SVG files are not manifest entries: re-running gates passes
+    rc = main(["gates", "--brief", str(brief_path), "--out", str(out_dir)])
+    assert rc == 0
+    assert json.loads(capsys.readouterr().out)["verdict"] == "pass"
+
+
+def test_cli_author_no_render(
+    brief_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import json
+
+    out_dir = tmp_path / "out"
+    rc = main(["author", "--brief", str(brief_path), "--out", str(out_dir), "--no-render"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "renders" not in payload
+    assert not list(out_dir.glob("*.views.png"))
+
+
+def test_mcp_author_inline_views_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+    import shutil
+
+    if shutil.which("rsvg-convert") is None:
+        pytest.skip("rsvg-convert not installed")
+    from mcp import types
+
+    from mech.mcp_server import call_tool
+
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    brief_dict = json.loads(
+        (Path(__file__).resolve().parent.parent / "examples" / "enclosure.brief.json").read_text()
+    )
+    result = call_tool("mech_author", {"brief": brief_dict, "out_dir": str(tmp_path / "out")})
+    assert not result.isError
+    images = [c for c in result.content if isinstance(c, types.ImageContent)]
+    assert len(images) == 1 and images[0].mimeType == "image/png"
+    text = result.content[0]
+    assert isinstance(text, types.TextContent)
+    payload = json.loads(text.text)
+    assert payload["verdict"] == "pass"
+    views = [r for r in payload["renders"] if r["kind"] == "views"]
+    assert views and Path(views[0]["png_path"]).name.endswith(".views.png")

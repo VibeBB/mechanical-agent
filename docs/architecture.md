@@ -66,6 +66,7 @@ output directory (verify-only, no regeneration).
 | mesh | STL facet counts sane; 3mf loads and matches part count |
 | interference | parts do not intersect (broadphase distance + boolean volume) |
 | board envelope | board + keepout + clearance fit inside the cavity |
+| harness anchors | declared `position_mm` inside the assembly bbox |
 | openings | each declared opening actually pierces the wall (residual-material probe) |
 | wall thickness | dominant-wall measurement ≥ process minimum |
 | parametric | DFM rules (declared + measured), mechanism rules, fits vs intent, stackups |
@@ -130,12 +131,15 @@ geometry yet).
 - `dxf_lint.py` — advisory readability lint (`lint_file`).
 - `render.py` — `render_dxf` DXF→SVG→PNG + shared `rasterize_svg`,
   `sha256_file`, `record_or_compare_baseline`.
-- `views.py` — `render_views` STEP→2x2 views sheet (`ViewsResult`).
+- `views.py` — `render_views` STEP→2x2 third-angle views sheet
+  (`ViewsResult`, optional anchor overlay via the envelope sidecar),
+  `render_author_outputs` (author-time DXF + views renders).
 - `advisory.py` — advisory envelope + typed visual-review records
   (`write_review_record`, `parse_visual_review`).
 - `records.py` — VRP v1 typed writers (`record_decision`,
   `record_impression`, `record_vision_review`, `records_summary`,
-  `tree_sha256`, `sha256_file`, `impression_is_prose`).
+  `tree_sha256`, `sha256_file`, `impression_is_prose`,
+  `event_ids` — mech-local JSONL reader used by liaison/envelope).
 - `liaison.py` — SLP v2 (`UXRequestV2`/`UXResponseV2`, `ux_inbox`,
   `ux_respond`, `liaison_dir`).
 - `envelope.py` — `envelope_source`, `write_envelope` (envelope +

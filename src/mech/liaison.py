@@ -26,8 +26,9 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import (
     BaseModel,
@@ -38,7 +39,7 @@ from pydantic import (
     model_validator,
 )
 
-from .records import RECORDS_DIR, sha256_file, tree_sha256
+from .records import RECORDS_DIR, event_ids, sha256_file, tree_sha256
 from .workspace import workspace_path, workspace_root
 
 TARGET: str = "mech"
@@ -59,6 +60,18 @@ _TARGETS = {
 
 _SHA256 = r"^[0-9a-f]{64}$"
 _SLUG = r"^[a-z0-9][a-z0-9._-]{0,63}$"
+_JOB_ID_TOKEN = re.compile(r"\b[a-z][a-z0-9_]*\b")
+
+
+def _aware_timestamp(value: str) -> str:
+    """ISO-8601 timestamp that parses and carries a timezone."""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"not an ISO-8601 timestamp: {value!r}") from exc
+    if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
+        raise ValueError(f"timestamp must be timezone-aware: {value!r}")
+    return value
 
 
 class _Strict(BaseModel):
@@ -88,10 +101,10 @@ class UXRequestV2(_Strict):
     risk: Literal["low", "high"]
     purpose: str = Field(min_length=20)
     rationale: str = ""
-    requested_changes: list[str] = Field(min_length=1)
+    requested_changes: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
     inputs: list[RequestInput] = Field(default_factory=list[RequestInput])
-    expected_deliverables: list[str] = Field(min_length=1)
-    acceptance: list[str] = Field(min_length=1)
+    expected_deliverables: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
+    acceptance: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
     depends_on: list[str] = Field(default_factory=list[str])
     created_at: str = Field(min_length=1)
 
@@ -102,12 +115,21 @@ class UXRequestV2(_Strict):
             raise ValueError(f"unknown target_agent: {value}")
         return value
 
+    @field_validator("created_at")
+    @classmethod
+    def _created_at_aware(cls, value: str) -> str:
+        return _aware_timestamp(value)
+
     @model_validator(mode="after")
     def _high_risk_cites_job(self) -> UXRequestV2:
-        if self.risk == "high" and not re.search(
-            r"ux[-_a-z0-9]*job[-_a-z0-9]*", self.rationale, re.IGNORECASE
+        # Mirror rule: job-id *membership* against the UX contract is
+        # UX-creator's own check (mech cannot see the contract); here we
+        # only require a substantive rationale that cites a job-id-shaped
+        # token (ux_creator.requests.JOB_ID).
+        if self.risk == "high" and (
+            len(self.rationale) < 20 or not _JOB_ID_TOKEN.search(self.rationale)
         ):
-            raise ValueError("high-risk requests must cite a UX job id in rationale")
+            raise ValueError("high-risk requests need a rationale of 20+ chars citing a job id")
         return self
 
 
@@ -130,8 +152,13 @@ class UXResponseV2(_Strict):
     gate_verdicts: list[GateVerdict] = Field(default_factory=list[GateVerdict])
     decision_refs: list[str] = Field(default_factory=list[str])
     impression_refs: list[str] = Field(default_factory=list[str])
-    questions_for_user: list[str] = Field(default_factory=list[str])
+    questions_for_user: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
     responded_at: str = Field(min_length=1)
+
+    @field_validator("responded_at")
+    @classmethod
+    def _responded_at_aware(cls, value: str) -> str:
+        return _aware_timestamp(value)
 
     @model_validator(mode="after")
     def _reason_length(self) -> UXResponseV2:
@@ -153,7 +180,7 @@ class RespondPayload(_Strict):
     design_reports: list[str] = Field(default_factory=list[str])
     decision_refs: list[str] = Field(default_factory=list[str])
     impression_refs: list[str] = Field(default_factory=list[str])
-    questions_for_user: list[str] = Field(default_factory=list[str])
+    questions_for_user: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
 
 
 def liaison_dir(root: Path | None = None) -> Path:
@@ -215,18 +242,25 @@ def _current_input_hashes(request: UXRequestV2, root: Path) -> tuple[dict[str, s
     return hashes, None
 
 
-def _is_stale(
+def _stale_reasons(
     request: UXRequestV2,
     current: dict[str, str],
     input_error: str | None,
     response: UXResponseV2 | None,
-) -> bool:
+) -> list[str]:
+    """Why the request/response pair is stale; empty when fresh."""
     if input_error is not None:
-        return True
-    for item in request.inputs:
-        if current.get(item.path) != item.sha256:
-            return True
-    return response is not None and response.input_hashes != current
+        return [input_error]
+    reasons = [
+        f"input changed: {item.path}"
+        for item in request.inputs
+        if current.get(item.path) != item.sha256
+    ]
+    if response is not None:
+        for path in sorted(set(current) | set(response.input_hashes)):
+            if response.input_hashes.get(path) != current.get(path):
+                reasons.append(f"response input_hashes differ: {path}")
+    return reasons
 
 
 def _responded_ids(requests: dict[str, UXRequestV2], root: Path) -> set[str]:
@@ -244,18 +278,32 @@ def _responded_ids(requests: dict[str, UXRequestV2], root: Path) -> set[str]:
     return answered
 
 
-def _blocked(request: UXRequestV2, requests: dict[str, UXRequestV2], answered: set[str]) -> bool:
-    def on_cycle(rid: str, chain: frozenset[str]) -> bool:
-        if rid == request.id and chain:
-            return True
-        next_request = requests.get(rid)
-        if next_request is None or rid in chain:
-            return False
-        return any(on_cycle(dep, chain | {rid}) for dep in next_request.depends_on)
+def _dependency_cycle(request: UXRequestV2, requests: dict[str, UXRequestV2]) -> list[str]:
+    """Cycle path (e.g. ['a','b','a']) if the request sits on one."""
 
-    if on_cycle(request.id, frozenset()):
-        return True
-    return any(dep not in answered for dep in request.depends_on)
+    def dfs(node_id: str, chain: tuple[str, ...]) -> list[str] | None:
+        node = requests.get(node_id)
+        if node is None or node_id in chain:
+            return None
+        chain = (*chain, node_id)
+        for dep in node.depends_on:
+            if dep == request.id:
+                return [*chain, dep]
+            found = dfs(dep, chain)
+            if found is not None:
+                return found
+        return None
+
+    return dfs(request.id, ()) or []
+
+
+def _blocked_reasons(
+    request: UXRequestV2, requests: dict[str, UXRequestV2], answered: set[str]
+) -> list[str]:
+    cycle = _dependency_cycle(request, requests)
+    if cycle:
+        return [f"dependency cycle: {' -> '.join(cycle)}"]
+    return [f"depends_on unanswered: {dep}" for dep in request.depends_on if dep not in answered]
 
 
 def ux_inbox(root: Path | None = None) -> dict[str, Any]:
@@ -285,14 +333,22 @@ def ux_inbox(root: Path | None = None) -> dict[str, Any]:
             elif response is not None and response.responder != TARGET:
                 response = None
         current, input_error = _current_input_hashes(request, base)
-        if _is_stale(request, current, input_error, response):
+        reasons: list[str] = []
+        if response_error is not None:
+            reasons.append(f"malformed response: {response_error}")
+        stale_reasons = _stale_reasons(request, current, input_error, response)
+        if stale_reasons:
             state = "stale"
+            reasons.extend(stale_reasons)
         elif response is not None:
             state = "answered"
-        elif _blocked(request, requests, answered):
-            state = "blocked"
         else:
-            state = "new"
+            blocked = _blocked_reasons(request, requests, answered)
+            if blocked:
+                state = "blocked"
+                reasons.extend(blocked)
+            else:
+                state = "new"
         entries.append(
             {
                 "id": request.id,
@@ -300,7 +356,7 @@ def ux_inbox(root: Path | None = None) -> dict[str, Any]:
                 "stage": request.stage,
                 "risk": request.risk,
                 "state": state,
-                "reasons": [],
+                "reasons": reasons,
                 "depends_on": list(request.depends_on),
             }
         )
@@ -310,24 +366,6 @@ def ux_inbox(root: Path | None = None) -> dict[str, Any]:
         "requests": entries,
         "malformed": malformed,
     }
-
-
-def _event_ids(log: Path) -> set[str]:
-    ids: set[str] = set()
-    if log.is_file():
-        for line in log.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                value: Any = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(value, dict):
-                continue
-            record = cast(dict[str, Any], value)
-            if isinstance(record.get("event_id"), str):
-                ids.add(record["event_id"])
-    return ids
 
 
 def _design_report_verdicts(report_path: Path) -> tuple[list[str], list[dict[str, str]]]:
@@ -405,7 +443,7 @@ def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, A
             raise ValueError("status 'done' needs at least one gate verdict")
         if not artifacts:
             raise ValueError("status 'done' needs at least one artifact")
-        if _is_stale(request, current, input_error, None):
+        if _stale_reasons(request, current, input_error, None):
             raise ValueError(
                 "status 'done' while the request is stale; answer with the current inputs"
             )
@@ -415,11 +453,11 @@ def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, A
             raise ValueError("status 'done' needs at least one impression_ref")
 
     records = base / RECORDS_DIR
-    decision_ids = _event_ids(records / "decisions.jsonl")
+    decision_ids = event_ids(records / "decisions.jsonl")
     for ref in respond.decision_refs:
         if ref not in decision_ids:
             raise ValueError(f"decision_ref not an event_id in decisions.jsonl: {ref}")
-    impression_ids = _event_ids(records / "impressions.jsonl") | _event_ids(
+    impression_ids = event_ids(records / "impressions.jsonl") | event_ids(
         records / "vision-reviews.jsonl"
     )
     for ref in respond.impression_refs:
@@ -430,8 +468,6 @@ def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, A
         raise ValueError(
             "reason needs at least 20 characters unless status is accepted/in_progress"
         )
-
-    from datetime import UTC, datetime
 
     response = UXResponseV2(
         request=request.id,

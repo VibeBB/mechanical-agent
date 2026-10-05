@@ -388,3 +388,74 @@ def test_report_ux_inbox_hook(ws: Path) -> None:
     assert "mech_ux_inbox" in context
     liaison.ux_respond(_respond_payload("pend-1", status="accepted"))
     assert run(ws).stdout.strip() == ""
+
+
+def test_inbox_reasons_populated(ws: Path) -> None:
+    ref = _input(ws, "spec.txt", b"v1")
+    _write_request(ws, "req-changed", inputs=[ref])
+    _write_request(ws, "req-missing", inputs=[{"path": "gone.txt", "sha256": "0" * 64}])
+    _write_request(ws, "req-dep", depends_on=["nobody"])
+    _write_request(ws, "cyc-a", depends_on=["cyc-b"])
+    _write_request(ws, "cyc-b", depends_on=["cyc-a"])
+    _write_request(ws, "req-bad-resp")
+    (ws / "liaison" / "req-bad-resp.ux-response.json").write_text("{bad", encoding="utf-8")
+    (ws / "spec.txt").write_bytes(b"v2")
+    out = {r["id"]: r["reasons"] for r in liaison.ux_inbox()["requests"]}
+    assert out["req-changed"] == ["input changed: spec.txt"]
+    assert out["req-missing"] == ["input missing: gone.txt"]
+    assert out["req-dep"] == ["depends_on unanswered: nobody"]
+    assert out["cyc-a"] == ["dependency cycle: cyc-a -> cyc-b -> cyc-a"]
+    assert out["cyc-b"] == ["dependency cycle: cyc-b -> cyc-a -> cyc-b"]
+    assert out["req-bad-resp"][0].startswith("malformed response")
+
+
+def test_inbox_reasons_response_hashes_differ(ws: Path) -> None:
+    ref = _input(ws, "spec.txt")
+    _write_request(ws, "req-r", inputs=[ref])
+    assert liaison.ux_respond(_respond_payload("req-r", status="accepted"))["verdict"] == "pass"
+    (ws / "spec.txt").write_bytes(b"changed")
+    reasons = liaison.ux_inbox()["requests"][0]["reasons"]
+    assert "input changed: spec.txt" in reasons
+    assert "response input_hashes differ: spec.txt" in reasons
+
+
+def test_request_timestamps_must_be_aware(ws: Path) -> None:
+    _write_request(ws, "naive", created_at="2026-10-05T00:00:00")
+    _write_request(ws, "garbage", created_at="not a date")
+    _write_request(ws, "aware", created_at="2026-10-05T00:00:00+02:00")
+    out = liaison.ux_inbox()
+    assert [r["id"] for r in out["requests"]] == ["aware"]
+    names = {Path(m["path"]).name for m in out["malformed"]}
+    assert names == {"naive.ux-request.json", "garbage.ux-request.json"}
+
+
+def test_request_list_items_must_be_nonempty(ws: Path) -> None:
+    _write_request(ws, "bad-change", requested_changes=[""])
+    _write_request(ws, "bad-deliv", expected_deliverables=["ok", ""])
+    _write_request(ws, "bad-accept", acceptance=[""])
+    out = liaison.ux_inbox()
+    assert out["requests"] == []
+    assert len(out["malformed"]) == 3
+
+
+def test_high_risk_rationale_rule(ws: Path) -> None:
+    # mech mirrors the shape only: 20+ chars with a job-id-like token;
+    # membership against the UX contract is UX-creator's own check.
+    _write_request(
+        ws,
+        "hi-ok",
+        risk="high",
+        rationale="board_swap changes the mounting strategy",
+    )
+    _write_request(ws, "hi-short", risk="high", rationale="tiny")
+    _write_request(ws, "hi-notoken", risk="high", rationale="AAA BBB CCC DDD EEE FFF")
+    out = liaison.ux_inbox()
+    assert [r["id"] for r in out["requests"]] == ["hi-ok"]
+    names = {Path(m["path"]).name for m in out["malformed"]}
+    assert names == {"hi-short.ux-request.json", "hi-notoken.ux-request.json"}
+
+
+def test_respond_questions_items_nonempty(ws: Path) -> None:
+    _write_request(ws, "req-q")
+    with pytest.raises(ValueError):
+        liaison.ux_respond(_respond_payload("req-q", status="accepted", questions_for_user=[""]))

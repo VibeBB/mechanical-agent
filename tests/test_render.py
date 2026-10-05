@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import shutil
 from pathlib import Path
 from typing import Any
@@ -236,13 +238,98 @@ def test_render_views_baseline(tmp_path: Path):
     assert second.baseline_sha256 == first.image_sha256
 
 
-def test_envelope_anchors_not_in_step_frame(
+def _asymmetric_step(tmp_path: Path) -> Path:
+    """Box plus a separate small cube at the +X/+Y/+Z corner, as STEP."""
+    from build123d import Box, Compound, Pos, export_step
+
+    path = tmp_path / "asym.step"
+    export_step(
+        Compound(children=[Box(40, 30, 20), Pos(20, 15, 10) * Box(4, 4, 4)]),
+        str(path),
+    )
+    return path
+
+
+def _path_length(line: list[tuple[float, float]]) -> float:
+    return sum(
+        math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1])
+        for i in range(len(line) - 1)
+    )
+
+
+def test_view_orientations(tmp_path: Path) -> None:
+    """Third-angle axes: the +X/+Y/+Z corner feature lands where expected."""
+    from build123d import import_step
+
+    from mech.views import _view_geometry  # pyright: ignore[reportPrivateUsage]
+
+    compound = import_step(_asymmetric_step(tmp_path))
+    bounds = compound.bounding_box()
+    center = (
+        bounds.min.X + bounds.size.X / 2,
+        bounds.min.Y + bounds.size.Y / 2,
+        bounds.min.Z + bounds.size.Z / 2,
+    )
+
+    def marker_center(
+        direction: tuple[float, float, float], up: tuple[float, float, float]
+    ) -> tuple[float, float]:
+        visible, hidden = _view_geometry(compound, center, direction, up)
+        # the marker's 4 mm edges are the only short polylines in the sheet
+        small = [
+            point
+            for line in [*visible, *hidden]
+            if 0.1 < _path_length(line) < 6.0
+            for point in line
+        ]
+        assert small, "marker edges missing from projection"
+        xs = [p[0] for p in small]
+        ys = [p[1] for p in small]
+        return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+
+    # front: screen +x is model +X, screen +y is model +Z
+    fx, fy = marker_center((0.0, -1.0, 0.0), (0.0, 0.0, 1.0))
+    assert fx > 0 and fy > 0
+    # top: screen +x is model +X, screen +y is model +Y
+    tx, ty = marker_center((0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
+    assert tx > 0 and ty > 0
+    # right (viewer at +X, up +Z): screen +x is model +Y, screen +y is +Z
+    rx, ry = marker_center((1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+    assert rx > 0 and ry > 0
+
+
+def _write_envelope_with_sidecar(
+    tmp_path: Path,
+    anchors: list[dict[str, Any]],
+    offset: list[float],
+) -> Path:
+    envelope = tmp_path / "demo.envelope.json"
+    envelope.write_text(
+        json.dumps({"schema_version": 1, "system": "mech", "anchors": anchors}),
+        encoding="utf-8",
+    )
+    tmp_path.joinpath("demo.envelope.provenance.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "system": "mech",
+                "anchor_frame": "assembly-bbox-min-corner",
+                "step_frame_offset_mm": offset,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return envelope
+
+
+def test_envelope_anchors_land_in_assembly_bbox(
     enclosure_brief_dict: dict[str, Any], tmp_path: Path
 ) -> None:
-    """Documents why render_views has no anchor overlay: envelope anchors
-    are declared in the design frame (0..width x 0..depth x 0..height of
-    the enclosure) while exported STEP parts are centered, so raw
-    position_mm values do not land inside the assembly bbox."""
+    """Envelope anchors are declared from the assembly bbox min corner;
+    adding the sidecar's step_frame_offset_mm lands them inside the
+    exported assembly's STEP bbox."""
+    import json as jsonlib
+
     from build123d import import_step
 
     data: dict[str, Any] = dict(enclosure_brief_dict)
@@ -256,23 +343,85 @@ def test_envelope_anchors_not_in_step_frame(
     export_design(enclosure_brief, design, out_dir)
     assembly = import_step(out_dir / f"{enclosure_brief.name}.step")
     bb = assembly.bounding_box()
-    anchors = [a.position_mm for a in enclosure_brief.harness_anchors]
-    assert anchors
-    in_box = [
-        a
-        for a in anchors
-        if a is not None
-        and bb.min.X - 5 <= a[0] <= bb.min.X + bb.size.X + 5
-        and bb.min.Y - 5 <= a[1] <= bb.min.Y + bb.size.Y + 5
-        and bb.min.Z - 5 <= a[2] <= bb.min.Z + bb.size.Z + 5
-    ]
-    assert not in_box  # hypothesis: shared frame — false for this example
-    # corner-origin reading of the same numbers does land inside the envelope
-    for a in anchors:
-        assert a is not None
-        assert -5 <= a[0] <= bb.size.X + 5
-        assert -5 <= a[1] <= bb.size.Y + 5
-        assert -5 <= a[2] <= bb.size.Z + 5
+    offset = [float(bb.min.X), float(bb.min.Y), float(bb.min.Z)]
+    for anchor in enclosure_brief.harness_anchors:
+        pos = anchor.position_mm
+        assert pos is not None
+        step_pt = [pos[i] + offset[i] for i in range(3)]
+        assert bb.min.X - 5 <= step_pt[0] <= bb.max.X + 5
+        assert bb.min.Y - 5 <= step_pt[1] <= bb.max.Y + 5
+        assert bb.min.Z - 5 <= step_pt[2] <= bb.max.Z + 5
+    # sidecar round-trip: write_envelope computes the same offset
+    from mech.envelope import write_envelope
+
+    provenance = write_envelope(enclosure_brief, out_dir / f"{enclosure_brief.name}.envelope.json")
+    assert provenance["anchor_frame"] == "assembly-bbox-min-corner"
+    assert provenance["step_frame_offset_mm"] == [round(v, 4) for v in offset]
+    assert (
+        jsonlib.loads(
+            (out_dir / f"{enclosure_brief.name}.envelope.provenance.json").read_text(
+                encoding="utf-8"
+            )
+        )["anchor_frame"]
+        == "assembly-bbox-min-corner"
+    )
+
+
+@pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
+def test_render_views_envelope_overlay(tmp_path: Path) -> None:
+    from mech.views import render_views
+
+    step = _step(tmp_path)
+    envelope = _write_envelope_with_sidecar(
+        tmp_path,
+        [{"name": "clip-01", "kind": "clip", "position_mm": [20.0, 15.0, 10.0]}],
+        [-20.0, -15.0, -10.0],
+    )
+    result = render_views(step, envelope_path=envelope)
+    svg = Path(result.svg_path).read_text(encoding="utf-8")
+    assert svg.count("<circle") == 4  # one mark per view
+    assert svg.count("clip-01") == 4
+
+
+def test_render_views_envelope_missing_sidecar_fails_closed(tmp_path: Path) -> None:
+    from mech.views import render_views
+
+    step = _step(tmp_path)
+    envelope = tmp_path / "demo.envelope.json"
+    envelope.write_text('{"schema_version": 1, "system": "mech", "anchors": []}')
+    with pytest.raises(RenderError, match="sidecar"):
+        render_views(step, envelope_path=envelope)
+
+
+def test_render_views_envelope_bad_frame_fails_closed(tmp_path: Path) -> None:
+    from mech.views import render_views
+
+    step = _step(tmp_path)
+    envelope = _write_envelope_with_sidecar(
+        tmp_path,
+        [{"name": "a", "position_mm": [1.0, 2.0, 3.0]}],
+        [0.0, 0.0, 0.0],
+    )
+    sidecar = tmp_path / "demo.envelope.provenance.json"
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["anchor_frame"] = "other-frame"
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(RenderError, match="anchor_frame"):
+        render_views(step, envelope_path=envelope)
+
+
+@pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
+def test_render_views_third_angle_layout(tmp_path: Path) -> None:
+    from mech.views import render_views
+
+    result = render_views(_step(tmp_path))
+    svg = Path(result.svg_path).read_text(encoding="utf-8")
+    assert "third-angle projection" in svg
+    assert "units mm" in svg
+    # row 0 = [top, iso], row 1 = [front, right]: labels' x/y order
+    label_y = {label: svg.index(f">{label}<") for label in ("top", "isometric", "front", "right")}
+    assert label_y["top"] < label_y["front"]
+    assert label_y["isometric"] < label_y["front"]
 
 
 def test_mcp_render_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

@@ -26,10 +26,14 @@ mech needed the same machinery plus a STEP-level render so the
   rsvg-convert path as `render_dxf` (shared helpers factored out of
   `render.py`). Missing rasterizer or projection error → `RenderError`
   (fail-closed). The MCP tool returns the PNG inline.
-- **No envelope anchor overlay.** The planned overlay assumed anchors
-  share the assembly STEP frame; the example's anchors prove they do not
-  (they fit a corner-origin design frame instead). The overlay was cut
-  and the frame question recorded in `docs/improvement-notes.md`.
+- **Anchor frame fixed + overlay added.** Harness anchors are defined
+  relative to the assembly bounding-box minimum corner
+  (`anchor_frame: "assembly-bbox-min-corner"`); the provenance sidecar
+  records `step_frame_offset_mm` (bbox min in STEP coords) so
+  `render_views --envelope` can translate anchors into the sheet, and a
+  `harness_anchor.within_envelope` gate keeps declared anchors inside
+  the envelope. Views render in third-angle layout ([top, iso] over
+  [front, right]) after fixing a mirrored top view.
 - SLP v2 via local strict mirrors (`UXRequestV2`/`UXResponseV2`,
   `extra="forbid"`, no UX imports): `mech_ux_inbox` (new/answered/
   stale/blocked + malformed), `mech_ux_respond` (writes

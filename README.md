@@ -34,9 +34,12 @@ look at them.
 **You get back:** STEP/STL/3MF CAD files, dimensioned DXF drawings, and a
 `design-report.json` that proves the design against deterministic gates
 (wall thickness vs process minimums, openings that really pierce, fits
-and tolerance stack-ups, part interference, …). Renders of every drawing
-and a 4-view sheet of every part so a human — or the AI's own vision —
-can sanity-check the geometry.
+and tolerance stack-ups, part interference, harness anchors inside the
+envelope, …). Authoring also produces advisory renders — every drawing
+plus a 4-view sheet (third-angle: top/iso over front/right) of every
+part and the assembly, with harness anchors marked when an envelope was
+exported — so a human, or the AI's own vision, can sanity-check the
+geometry.
 
 ### How it works with the sister plugins
 
@@ -103,8 +106,11 @@ mech が見て取り入れます。
 
 **出力:** STEP/STL/3MF の CAD ファイル、寸法入り DXF 図面、そして
 決定論的ゲートで証明した `design-report.json`（工程最小肉厚、実際に
-貫通する開口、嵌合・公差積み上げ、部品干渉など）。全図面のレンダリングと
-各部品の4面図シートも生成し、人や AI の vision で幾何を確認できます。
+貫通する開口、嵌合・公差積み上げ、部品干渉、筐体内のハーネスアンカー
+など）。作図時にアドバイザリのレンダリングも生成します — 全図面と各部品・
+アセンブリの4面図シート（第三角法：上段が上面/アイソメ、下段が正面/右側面、
+エンベロープ出力済みならアンカー表示付き）— で、人や AI の vision が
+幾何を確認できます。
 
 ### 姉妹プラグインとの連携
 

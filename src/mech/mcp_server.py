@@ -93,6 +93,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "brief": {"type": "object"},
             "out_dir": {"type": "string"},
+            "render": {
+                "type": "boolean",
+                "default": True,
+                "description": (
+                    "also render every DXF and a views sheet per STEP (advisory "
+                    "images for the vision lane); a render failure is reported "
+                    "but never changes the gate verdict"
+                ),
+            },
         },
         "required": ["brief", "out_dir"],
         "additionalProperties": False,
@@ -139,6 +148,7 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "type": "object",
         "properties": {
             "step": {"type": "string"},
+            "envelope": {"type": "string"},
             "baseline_path": {"type": "string"},
         },
         "required": ["step"],
@@ -345,10 +355,33 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     if name == "mech_author":
         export_design(brief, design, out_dir)
     report = run_gates(brief, design, out_dir)
-    report_path = write_report(brief, design, report, out_dir)
+    renders: list[dict[str, Any]] | dict[str, Any] | None = None
+    if name == "mech_author" and bool(arguments.get("render", True)):
+        from .render import RenderError
+        from .views import render_author_outputs
+
+        try:
+            renders = render_author_outputs(brief.name, [p.part_id for p in design.parts], out_dir)
+        except (RenderError, ValueError, OSError) as exc:
+            renders = {"status": "error", "detail": str(exc)}
+    report_path = write_report(brief, design, report, out_dir, renders=renders)
     payload = report.to_dict(brief)
     payload["report_path"] = str(report_path)
-    return _ok(payload)
+    assembly_views: str | None = None
+    if isinstance(renders, list):
+        payload["renders"] = renders
+        for entry in renders:
+            if entry["kind"] == "views" and entry["source"].endswith(f"/{brief.name}.step"):
+                assembly_views = str(entry["png_path"])
+                break
+    elif renders is not None:
+        payload["renders"] = renders
+    result = _ok(payload)
+    if assembly_views is not None:
+        image = _image_content(Path(assembly_views))
+        if image is not None:
+            result.content.append(image)
+    return result
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
@@ -475,10 +508,14 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             from .views import render_views
 
             step_path = _path_arg(arguments, "step")
+            envelope_path = _optional_path_arg(arguments, "envelope")
             baseline_path = _optional_path_arg(arguments, "baseline_path")
-            if baseline_path is not None:
-                reject_symlinks(baseline_path)
-            views = render_views(step_path, baseline_path=baseline_path)
+            for extra in (envelope_path, baseline_path):
+                if extra is not None:
+                    reject_symlinks(extra)
+            views = render_views(
+                step_path, envelope_path=envelope_path, baseline_path=baseline_path
+            )
             payload = {
                 "verdict": "pass",
                 "step_path": views.step_path,

@@ -89,6 +89,19 @@ def _load_and_generate(brief_path: str) -> tuple[DesignBrief, Any]:
     return brief, design
 
 
+def _author_renders(
+    brief: DesignBrief, design: Any, out_dir: Path
+) -> list[dict[str, Any]] | dict[str, Any]:
+    """L2 renders after authoring; a render error never touches the verdict."""
+    from .render import RenderError
+    from .views import render_author_outputs
+
+    try:
+        return render_author_outputs(brief.name, [p.part_id for p in design.parts], out_dir)
+    except (RenderError, ValueError, OSError) as exc:
+        return {"status": "error", "detail": str(exc)}
+
+
 def _cmd_author(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = Path(args.out)
     try:
@@ -97,9 +110,14 @@ def _cmd_author(args: argparse.Namespace) -> dict[str, Any]:
         return {"verdict": "fail", "stage": "generate", "detail": str(exc)}
     export_design(brief, design, out_dir)
     gate_report = run_gates(brief, design, out_dir)
-    report_path = write_report(brief, design, gate_report, out_dir)
+    renders: list[dict[str, Any]] | dict[str, Any] | None = None
+    if not args.no_render:
+        renders = _author_renders(brief, design, out_dir)
+    report_path = write_report(brief, design, gate_report, out_dir, renders=renders)
     result = gate_report.to_dict(brief)
     result["report_path"] = str(report_path)
+    if renders is not None:
+        result["renders"] = renders
     return result
 
 
@@ -242,6 +260,7 @@ def _cmd_render_views(args: argparse.Namespace) -> dict[str, Any]:
 
     result = render_views(
         Path(args.step),
+        envelope_path=Path(args.envelope) if args.envelope else None,
         baseline_path=Path(args.baseline) if args.baseline else None,
     )
     payload: dict[str, Any] = {
@@ -295,6 +314,11 @@ def build_parser() -> argparse.ArgumentParser:
     author_p = sub.add_parser("author", help="generate + export + gates + report")
     author_p.add_argument("--brief", required=True)
     author_p.add_argument("--out", required=True)
+    author_p.add_argument(
+        "--no-render",
+        action="store_true",
+        help="skip the advisory DXF/views renders (default: render them)",
+    )
 
     export_p = sub.add_parser("export", help="generate + export only")
     export_p.add_argument("--brief", required=True)
@@ -351,6 +375,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline",
         default=None,
         help="optional baseline JSON: recorded when missing, compared when present",
+    )
+    views_p.add_argument(
+        "--envelope",
+        default=None,
+        help="optional <name>.envelope.json: overlay harness anchors "
+        "(requires its provenance sidecar with step_frame_offset_mm)",
     )
 
     review_p = sub.add_parser(

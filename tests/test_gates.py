@@ -78,3 +78,43 @@ def test_gear_gates(gear_brief_dict: dict[str, Any], tmp_path: Path):
     design = _authored(brief, out_dir)
     report = run_gates(brief, design, out_dir)
     assert report.verdict == "pass"
+
+
+def _with_anchor(brief: DesignBrief, position: list[float] | None) -> DesignBrief:
+    data = brief.model_dump(mode="json")
+    anchor: dict[str, Any] = {"name": "clip-01", "kind": "clip"}
+    if position is not None:
+        anchor["position_mm"] = position
+    data["harness_anchors"] = [anchor]
+    return DesignBrief.model_validate(data)
+
+
+def test_harness_anchor_within_envelope(enclosure_brief: DesignBrief, tmp_path: Path):
+    """Anchors measured from the assembly bbox min corner pass inside it."""
+    brief = _with_anchor(enclosure_brief, [60.0, 0.0, 20.0])
+    out_dir = tmp_path / "out"
+    design = _authored(brief, out_dir)
+    report = run_gates(brief, design, out_dir)
+    checks = [c for c in report.checks if c.id == "harness_anchor.within_envelope"]
+    assert len(checks) == 1
+    assert checks[0].status == "pass"
+    assert checks[0].subject == "clip-01"
+    assert report.verdict == "pass"
+
+
+def test_harness_anchor_outside_envelope_fails(enclosure_brief: DesignBrief, tmp_path: Path):
+    brief = _with_anchor(enclosure_brief, [200.0, 0.0, 20.0])
+    out_dir = tmp_path / "out"
+    design = _authored(brief, out_dir)
+    report = run_gates(brief, design, out_dir)
+    checks = [c for c in report.checks if c.id == "harness_anchor.within_envelope"]
+    assert checks[0].status == "fail"
+    assert report.verdict == "fail"
+
+
+def test_harness_anchor_without_position_no_check(enclosure_brief: DesignBrief, tmp_path: Path):
+    brief = _with_anchor(enclosure_brief, None)
+    out_dir = tmp_path / "out"
+    design = _authored(brief, out_dir)
+    report = run_gates(brief, design, out_dir)
+    assert not [c for c in report.checks if c.id == "harness_anchor.within_envelope"]
