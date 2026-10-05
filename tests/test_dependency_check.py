@@ -44,7 +44,7 @@ def test_lock_versions_cover_direct_deps():
     missing = [name for name in deps if name not in versions]
     assert missing == []
     assert versions["build123d"] == "0.13.0"
-    assert versions["openhands-sdk"] == "1.51.0"
+    assert versions["openhands-sdk"] == "1.52.0"
     assert versions["pytest-cov"] == "7.1.0"
 
 

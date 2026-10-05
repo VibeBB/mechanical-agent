@@ -13,6 +13,7 @@
 - [research/sdk-v1.50.0-feature-evaluation.md](research/sdk-v1.50.0-feature-evaluation.md) — OpenHands SDK and uv update decisions
 - [SDK v1.50.1 feature evaluation](research/sdk-v1.50.1-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 - [SDK v1.51.0 feature evaluation](research/sdk-v1.51.0-feature-evaluation.md) — OpenHands SDK/tools/uv adoption decisions
+- [SDK v1.52.0 feature evaluation](research/sdk-v1.52.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 
 ## Accepted ADRs
 
