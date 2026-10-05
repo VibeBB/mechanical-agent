@@ -9,8 +9,8 @@ dependencies = [
     "build123d==0.13.0",
     "ezdxf==1.4.4",
     "mcp>=1.29,<2",
-    "openhands-sdk==1.51.0",
-    "openhands-tools==1.51.0",
+    "openhands-sdk==1.52.0",
+    "openhands-tools==1.52.0",
 ]
 
 [dependency-groups]
