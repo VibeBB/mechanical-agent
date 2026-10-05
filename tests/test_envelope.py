@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -116,5 +117,44 @@ def test_doctor_warn_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_write_envelope_roundtrip(enclosure_brief_dict: dict[str, Any], tmp_path: Path) -> None:
     brief = DesignBrief.model_validate(_with_anchors(enclosure_brief_dict))
-    out_path = write_envelope(brief, tmp_path / "x.envelope.json")
+    out_path = tmp_path / "x.envelope.json"
+    provenance = write_envelope(brief, out_path)
     _assert_envelope_shape(json.loads(out_path.read_text(encoding="utf-8")))
+    sidecar = tmp_path / "x.envelope.provenance.json"
+    assert sidecar.is_file()
+    assert json.loads(sidecar.read_text(encoding="utf-8")) == provenance
+    assert provenance["schema_version"] == 1
+    assert provenance["system"] == "mech"
+    assert provenance["envelope_sha256"] == hashlib.sha256(out_path.read_bytes()).hexdigest()
+
+
+def test_envelope_provenance_sidecar(
+    enclosure_brief_dict: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    brief_path = tmp_path / "x.brief.json"
+    data = _with_anchors(enclosure_brief_dict)
+    brief_path.write_text(json.dumps(data), encoding="utf-8")
+    report_path = tmp_path / "design-report.json"
+    report_path.write_text(json.dumps({"verdict": "pass", "checks": []}), encoding="utf-8")
+    brief = DesignBrief.model_validate(data)
+    provenance = write_envelope(
+        brief,
+        tmp_path / "x.envelope.json",
+        brief_path=brief_path,
+        design_report_path=report_path,
+    )
+    assert provenance["brief_path"] == str(brief_path)
+    assert provenance["brief_sha256"] == hashlib.sha256(brief_path.read_bytes()).hexdigest()
+    assert (
+        provenance["design_report_sha256"] == hashlib.sha256(report_path.read_bytes()).hexdigest()
+    )
+
+
+def test_envelope_decision_refs_validated(
+    enclosure_brief_dict: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    brief = DesignBrief.model_validate(_with_anchors(enclosure_brief_dict))
+    with pytest.raises(ValueError, match="decision_ref"):
+        write_envelope(brief, tmp_path / "x.envelope.json", decision_refs=["0" * 64])
