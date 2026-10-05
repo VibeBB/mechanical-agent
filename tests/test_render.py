@@ -451,3 +451,171 @@ def test_mcp_render_views_fail_closed(tmp_path: Path, monkeypatch: pytest.Monkey
 
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     assert call_tool("mech_render_views", {"step": "nope.step"}).isError
+
+
+def test_screen_basis_matches_project_to_viewport() -> None:
+    # u = normalize(up x dir), v = dir x u — same basis project_to_viewport uses.
+    from mech.views import _project_point, _screen_basis
+
+    # front: viewer at -Y (direction (0,-1,0)), up +Z → +X right, +Z up
+    u, v = _screen_basis((0, -1, 0), (0, 0, 1))
+    assert u == pytest.approx((1.0, 0.0, 0.0))
+    assert v == pytest.approx((0.0, 0.0, 1.0))
+    # top: viewer at +Z, up +Y → +X right, +Y up
+    u, v = _screen_basis((0, 0, 1), (0, 1, 0))
+    assert u == pytest.approx((1.0, 0.0, 0.0))
+    assert v == pytest.approx((0.0, 1.0, 0.0))
+    # right: viewer at +X, up +Z → +Y right, +Z up
+    u, v = _screen_basis((1, 0, 0), (0, 0, 1))
+    assert u == pytest.approx((0.0, 1.0, 0.0))
+    assert v == pytest.approx((0.0, 0.0, 1.0))
+
+    pt = _project_point((3.0, 4.0, 5.0), (0.0, 0.0, 0.0), (1, 0, 0), (0, 0, 1))
+    assert pt == pytest.approx((4.0, 5.0))
+    # non-unit direction is normalized
+    pt = _project_point((3.0, 4.0, 5.0), (0.0, 0.0, 0.0), (2, 0, 0), (0, 0, 1))
+    assert pt == pytest.approx((4.0, 5.0))
+    # center offsets the projection
+    pt = _project_point((3.0, 4.0, 5.0), (0.0, 4.0, 0.0), (1, 0, 0), (0, 0, 1))
+    assert pt == pytest.approx((0.0, 5.0))
+
+
+def test_lines_bbox() -> None:
+    from mech.views import _lines_bbox
+
+    assert _lines_bbox([[(1.0, 2.0), (3.0, 4.0)], [[-1.0, 5.0]]]) == (
+        -1.0,
+        3.0,
+        2.0,
+        5.0,
+    )
+
+
+def test_polylines_svg() -> None:
+    from mech.views import _polylines_svg
+
+    out = _polylines_svg([[(1.0, 2.0), (3.0, 4.0)]], (10.0, 20.0), 2.0, "s")
+    assert out == ['<polyline points="12.000,16.000 16.000,12.000" fill="none" s/>']
+
+
+def test_anchor_marks_svg() -> None:
+    from mech.views import _anchor_marks_svg
+
+    out = _anchor_marks_svg([("clip-1", (2.0, 3.0))], (10.0, 20.0), 2.0)
+    assert len(out) == 4
+    assert out[0].startswith('<circle cx="14.000" cy="14.000" r="1.5"')
+    assert "clip-1" in out[3]
+    assert out[3].startswith("<text")
+
+
+def test_load_envelope_anchors(tmp_path: Path) -> None:
+    from mech.views import _load_envelope_anchors
+
+    envelope = _write_envelope_with_sidecar(
+        tmp_path,
+        [{"name": "a", "position_mm": [1.0, 2.0, 3.0]}],
+        [-1.0, -2.0, -3.0],
+    )
+    assert _load_envelope_anchors(envelope) == [("a", (0.0, 0.0, 0.0))]
+
+    # anchors without name/position are skipped
+    tmp_path.joinpath("demo.envelope.json").write_text(
+        json.dumps(
+            {
+                "anchors": [
+                    {"name": "no-pos"},
+                    {"position_mm": [1, 2, 3]},
+                    {"name": "short", "position_mm": [1, 2]},
+                    "not-a-dict",
+                    {"name": "ok", "position_mm": [1, 0, 0]},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert _load_envelope_anchors(envelope) == [("ok", (0.0, -2.0, -3.0))]
+
+
+def test_load_envelope_anchors_fail_closed(tmp_path: Path) -> None:
+    from mech.views import _load_envelope_anchors
+
+    with pytest.raises(RenderError, match="envelope file missing"):
+        _load_envelope_anchors(tmp_path / "nope.envelope.json")
+
+    bad = tmp_path / "bad.envelope.json"
+    bad.write_text("{not json", encoding="utf-8")
+    with pytest.raises(RenderError, match="cannot read envelope"):
+        _load_envelope_anchors(bad)
+
+    envelope = tmp_path / "demo.envelope.json"
+    envelope.write_text('{"anchors": []}', encoding="utf-8")
+    with pytest.raises(RenderError, match="provenance sidecar"):
+        _load_envelope_anchors(envelope)
+
+    sidecar = tmp_path / "demo.envelope.provenance.json"
+    sidecar.write_text("{bad", encoding="utf-8")
+    with pytest.raises(RenderError, match="provenance sidecar"):
+        _load_envelope_anchors(envelope)
+
+    sidecar.write_text("[1,2]", encoding="utf-8")
+    with pytest.raises(RenderError, match="not an object"):
+        _load_envelope_anchors(envelope)
+
+    sidecar.write_text(
+        json.dumps({"anchor_frame": "other", "step_frame_offset_mm": [0, 0, 0]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(RenderError, match="anchor_frame"):
+        _load_envelope_anchors(envelope)
+
+    for offset in (None, [0, 0], ["a", 0, 0]):
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "anchor_frame": "assembly-bbox-min-corner",
+                    "step_frame_offset_mm": offset,
+                }
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(RenderError, match="step_frame_offset_mm"):
+            _load_envelope_anchors(envelope)
+
+    sidecar.write_text(
+        json.dumps(
+            {
+                "anchor_frame": "assembly-bbox-min-corner",
+                "step_frame_offset_mm": [0, 0, 0],
+            }
+        ),
+        encoding="utf-8",
+    )
+    envelope.write_text('{"anchors": "not-a-list"}', encoding="utf-8")
+    with pytest.raises(RenderError, match="no anchors list"):
+        _load_envelope_anchors(envelope)
+
+    envelope.write_text('{"anchors": []}', encoding="utf-8")
+    with pytest.raises(RenderError, match="no anchors with position_mm"):
+        _load_envelope_anchors(envelope)
+
+
+def test_render_author_outputs(tmp_path: Path, enclosure_brief: DesignBrief) -> None:
+    from mech.views import render_author_outputs
+
+    out_dir = tmp_path / "out"
+    design = generate(enclosure_brief)
+    export_design(enclosure_brief, design, out_dir)
+    if _RSVG is None:
+        with pytest.raises(RenderError):
+            render_author_outputs(enclosure_brief.name, ["shell"], out_dir)
+        return
+    renders = render_author_outputs(
+        enclosure_brief.name,
+        [p.part_id for p in design.parts] if hasattr(design, "parts") else ["shell"],
+        out_dir,
+    )
+    kinds = {r["kind"] for r in renders}
+    assert kinds == {"dxf", "views"}
+    for r in renders:
+        assert Path(r["png_path"]).is_file()
+        assert len(r["image_sha256"]) == 64
