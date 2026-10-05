@@ -25,7 +25,7 @@ user conversation
       export(brief)     ── STEP/STL/3MF/DXF + manifest.json + provenance.json
                           (DXF outlines are annotated: frame, extents dims,
                           hole diameters + tag, hole/openings/board-mount
-                          tables, notes, title block; each DXF also gets a
+                          tables, notes, ISO 7200 title block; each DXF also gets a
                           *.dxf_lint.json advisory readability report)
       run_gates(brief)  ── GateCheck[] -> GateReport (verdict pass|fail)
       write_report()    ── design-report.json + design-report.md

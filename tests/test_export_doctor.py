@@ -169,8 +169,8 @@ def test_dxf_annotated_layers_and_title(enclosure_brief: DesignBrief, tmp_path: 
     layers = {e.dxf.layer for e in msp}
     assert {"0", "FRAME", "DIMS", "TITLE"} <= layers
     texts = [e.dxf.text for e in msp if e.dxftype() == "TEXT"]
-    assert any(t.startswith("DESIGN") for t in texts)
-    assert any(t.startswith("PART") and "shell" in t for t in texts)
+    assert any(t.startswith("TITLE") for t in texts)
+    assert any(t.startswith("TITLE") and "shell" in t for t in texts)
     # overall extents dims: "80" and "60" for the 80x60 enclosure
     assert "80" in texts and "60" in texts
 

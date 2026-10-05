@@ -24,6 +24,7 @@ from ezdxf import bbox
 
 from . import __version__
 from .brief import (
+    DrawingInfo,
     EnclosureSpec,
     FitDeclaration,
     Opening,
@@ -362,6 +363,7 @@ def _notes_block(
     anchor_top: float,
     height: float,
     layer: str,
+    box_w: float | None = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
     """Stacked notes/hole-table block right-aligned above the title block —
     the ISO 7200 position for tables. Returns its bounding rect."""
@@ -371,8 +373,7 @@ def _notes_block(
     if box_h > frame_h * 0.45:
         row_h = max(height * _MIN_ROW_PITCH, frame_h * 0.45 / len(rows))
         box_h = row_h * len(rows)
-    text_w = height * 0.95
-    box_w = (max(len(row) for row in rows) + 2) * text_w
+    box_w = box_w or _column_width(rows, height)
     x0 = frame_max[0] - box_w
     y0 = anchor_top
     box_top = y0 + box_h
@@ -397,21 +398,44 @@ def _notes_block(
     return (x0, y0), (frame_max[0], box_top)
 
 
+def _column_width(rows: list[str], height: float) -> float:
+    return (max(len(row) for row in rows) + 2) * height * 0.95
+
+
 def _title_rows(
     design: str,
     part_id: str,
     material: str | None,
     process: str | None,
+    drawing: DrawingInfo | None = None,
+    source_sha256: str | None = None,
 ) -> list[str]:
+    """ISO 7200 title-block rows, top to bottom: the identification zone
+    (owner, number, revision, issue date, sheet) is the bottom-right row."""
+    info = drawing or DrawingInfo()
+    blank = "\u2014"
+
+    def opt(label: str, value: str | None) -> list[str]:
+        return [f"{label:<12}{value}"] if value is not None else []
+
     return [
-        f"DESIGN  {design}",
-        f"PART    {part_id}",
-        *([f"MATERIAL {material}"] if material is not None else []),
-        *([f"PROCESS  {process}"] if process is not None else []),
-        "SCALE   1:1   UNITS mm",
-        "REV     A",
-        f"GENERATOR mech {__version__}",
-        "FORMAT  outline (top)",
+        f"{'TITLE':<12}{design} {part_id}",
+        *opt("SUPPL.", info.supplementary_title),
+        f"{'DOC TYPE':<12}Part drawing, outline (top)",
+        *opt("MATERIAL", material),
+        *opt("PROCESS", process),
+        f"{'SCALE':<12}1:1   UNITS mm",
+        *opt("CLASS", info.classification),
+        *opt("DEPT", info.responsible_dept),
+        *opt("TECH REF", info.technical_reference),
+        f"{'CREATED BY':<12}{info.created_by or blank}",
+        f"{'APPROVED BY':<12}{info.approved_by or blank}",
+        f"{'STATUS':<12}{info.status}",
+        f"{'GENERATOR':<12}mech {__version__}",
+        *opt("BRIEF SHA", source_sha256[:16] if source_sha256 else None),
+        f"{'OWNER':<12}{info.legal_owner or blank}",
+        f"{'ID NO.':<12}{info.identification(design, part_id)}   REV {info.revision}",
+        f"{'DATE':<12}{info.date_of_issue or blank}   LANG {info.language}   SHEET 1/1",
     ]
 
 
@@ -424,18 +448,20 @@ def _title_block(
     part_id: str,
     material: str | None = None,
     process: str | None = None,
+    drawing: DrawingInfo | None = None,
+    source_sha256: str | None = None,
     height: float,
     layer: str,
+    box_w: float | None = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
-    rows = _title_rows(design, part_id, material, process)
+    rows = _title_rows(design, part_id, material, process, drawing, source_sha256)
     row_h = height * 1.6
     box_h = row_h * len(rows)
     frame_h = frame_max[1] - frame_min[1]
     if box_h > frame_h * 0.28:
         row_h = max(height * _MIN_ROW_PITCH, frame_h * 0.28 / len(rows))
         box_h = row_h * len(rows)
-    text_w = height * 0.95
-    box_w = (max(len(row) for row in rows) + 2) * text_w
+    box_w = box_w or _column_width(rows, height)
     x0 = frame_max[0] - box_w
     y0 = frame_min[1]
     box_top = y0 + box_h
@@ -469,6 +495,8 @@ def annotate_dxf(
     process: str | None = None,
     fits: list[FitDeclaration] | None = None,
     enclosure: EnclosureSpec | None = None,
+    drawing: DrawingInfo | None = None,
+    source_sha256: str | None = None,
 ) -> None:
     """Draw a frame, overall extents dimensions, hole diameters + a hole
     table, center marks, a notes block, and a title block into the DXF at
@@ -505,15 +533,14 @@ def annotate_dxf(
     # margin by exactly the notes block's width, so notes and the hole
     # table never crowd the drawing and the title block anchors the
     # column's bottom-right corner.
-    notes_w = (max(len(row) for row in notes_rows) + 2) * height * 0.95
-    fx1 += margin * 0.4 + notes_w
+    title_rows = _title_rows(design, part_id, material, process, drawing, source_sha256)
+    column_w = max(_column_width(notes_rows, height), _column_width(title_rows, height))
+    fx1 += margin * 0.4 + column_w
     # The sheet must also fit the column vertically: when the title and
     # notes stacks together exceed the frame height (wide, short parts),
     # grow the frame upward — the extra sheet area sits above the part,
     # like an oversized sheet around a small drawing.
-    stack_h = (
-        len(notes_rows) + len(_title_rows(design, part_id, material, process))
-    ) * height * 1.6 + height * 1.5
+    stack_h = (len(notes_rows) + len(title_rows)) * height * 1.6 + height * 1.5
     if stack_h > fy1 - fy0:
         fy1 += stack_h - (fy1 - fy0)
     msp.add_lwpolyline(
@@ -551,8 +578,11 @@ def annotate_dxf(
         part_id=part_id,
         material=material,
         process=process,
+        drawing=drawing,
+        source_sha256=source_sha256,
         height=height,
         layer="TITLE",
+        box_w=column_w,
     )
     # The notes/hole-table block stacks directly above the title block; its
     # footprint joins `blocked` so hole-diameter labels dodge it too.
@@ -564,6 +594,7 @@ def annotate_dxf(
         anchor_top=title_rect[1][1],
         height=height,
         layer="NOTES",
+        box_w=column_w,
     )
     blocked = [
         (
