@@ -66,6 +66,7 @@ output directory (verify-only, no regeneration).
 | mesh | STL facet counts sane; 3mf loads and matches part count |
 | interference | parts do not intersect (broadphase distance + boolean volume) |
 | board envelope | board + keepout + clearance fit inside the cavity |
+| harness anchors | declared `position_mm` inside the assembly bbox |
 | openings | each declared opening actually pierces the wall (residual-material probe) |
 | wall thickness | dominant-wall measurement ≥ process minimum |
 | parametric | DFM rules (declared + measured), mechanism rules, fits vs intent, stackups |
@@ -89,21 +90,67 @@ geometry yet).
 
 ## Plugin surface
 
-- **Skills** (6): brief/intake workflow, enclosure recipe, mechanism recipe,
-  DFM rule tables, gate interpretation, end-to-end workflow.
+- **Skills** (7): brief/intake workflow, brief rules (path-triggered),
+  enclosure recipe, mechanism recipe, DFM rule tables, gate
+  interpretation, end-to-end workflow — see [skills.md](skills.md).
 - **Agents** (3 task sub-agents): `mech-brief` (conversation → intake),
-  `mech-design` (brief → author), `mech-review` (reads design-report +
-  renders projections; advisory only).
+  `mech-design` (brief → author → views self-check), `mech-review`
+  (reads design-report + renders projections; advisory only) — see
+  [agents.md](agents.md).
 - **Commands** (4): `/mech:design`, `/mech:doctor`, `/mech:gates`,
-  `/mech:export`.
-- **Hooks** (4 groups): `session_start` mech-doctor probe; `pre_tool_use`
+  `/mech:export` — see [commands.md](commands.md).
+- **Hooks** (5 groups): `session_start` mech-doctor probe, intake
+  attachments, LLM profiles, `require-records` session marker,
+  `report-ux-inbox` pending liaison list; `pre_tool_use`
   `protect-generated` blocks writes to artifacts (stdin JSON, exit 2
-  blocks); `stop` `report-design-status` summarizes `design-report.json`;
-  `post_tool_use` `record-vision-tool-event` logs vision calls as L3
-  telemetry.
+  blocks) and `safety-rail` guards the terminal; `stop`
+  `require-records` (first — refuses unfinished records) then
+  `report-design-status`; `post_tool_use` vision event + image
+  observation loggers — full inventory in [hooks.md](hooks.md).
 - **MCP**: `.mcp.json` → `scripts/mech_launcher.py` (resolves plugin root,
   points PYTHONPATH at the matching `src/`) → `python -m mech.mcp_server`.
-  Tools mirror CLI commands exactly.
+  Tools mirror CLI commands exactly — every tool documented in
+  [mcp.md](mcp.md).
+
+## Module reference (`src/mech`)
+
+- `brief.py` — `DesignBrief` and all spec models (the contract source of
+  truth); `load_brief`, `brief_sha256`.
+- `intake.py` — `Intake`/`IntakeReport`, `check_intake`, `load_intake`
+  (R*/A*/Q* coverage + evidence byte-binding).
+- `standards.py` — materials, process limits, ISO metric threads,
+  bearing seats; `material()`, `thread()`.
+- `fits.py` — ISO 286 limits-and-fits (`evaluate_fit` → `FitResult`).
+- `stackup.py` — 1-D worst-case + RSS stackups (`StackupResult`).
+- `dfm.py` / `mechanism.py` — process rule checks and gear/snap/rib/
+  boss/hinge/detent rules (`DfmFinding`, `MechanismFinding`).
+- `generators/` — `generate(brief)` dispatch into parametric builders.
+- `gates.py` — authoritative gate runner (`run_gates` → `GateReport`).
+- `export.py` — `export_design`: STEP/STL/3MF/DXF + manifest + provenance.
+- `dxf_annotate.py` — deterministic DXF frame/dims/title block overlay.
+- `dxf_lint.py` — advisory readability lint (`lint_file`).
+- `render.py` — `render_dxf` DXF→SVG→PNG + shared `rasterize_svg`,
+  `sha256_file`, `record_or_compare_baseline`.
+- `views.py` — `render_views` STEP→2x2 third-angle views sheet
+  (`ViewsResult`, optional anchor overlay via the envelope sidecar),
+  `render_author_outputs` (author-time DXF + views renders).
+- `advisory.py` — advisory envelope + typed visual-review records
+  (`write_review_record`, `parse_visual_review`).
+- `records.py` — VRP v1 typed writers (`record_decision`,
+  `record_impression`, `record_vision_review`, `records_summary`,
+  `tree_sha256`, `sha256_file`, `impression_is_prose`,
+  `event_ids` — mech-local JSONL reader used by liaison/envelope).
+- `liaison.py` — SLP v2 (`UXRequestV2`/`UXResponseV2`, `ux_inbox`,
+  `ux_respond`, `liaison_dir`).
+- `envelope.py` — `envelope_source`, `write_envelope` (envelope +
+  provenance sidecar).
+- `report.py` — `write_report` design-report.json/md.
+- `doctor.py` — `run_doctor` environment probe.
+- `mcp_server.py` — stdio MCP boundary (tool schemas, dispatch,
+  annotations).
+- `cli.py` — `python -m mech` subcommands.
+- `workspace.py` — `workspace_root`, `workspace_path` (confinement),
+  `reject_symlinks`.
 
 ## Error model
 

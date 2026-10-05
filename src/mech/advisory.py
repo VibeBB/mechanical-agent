@@ -15,20 +15,16 @@ from pydantic import (
     field_validator,
 )
 
+from .records import IMPRESSION_MIN_CHARS, impression_is_prose
+
 VISION_REVIEW_TOOL = "vision_review"
-IMPRESSION_MIN_LENGTH = 240
-_SENTENCE_MARKS = "。.!?"
-
-
-def _impression_is_prose(value: str) -> str:
-    if sum(value.count(mark) for mark in _SENTENCE_MARKS) < 2:
-        raise ValueError("impression must be a multi-sentence reading")
-    return value
+IMPRESSION_MIN_LENGTH = IMPRESSION_MIN_CHARS
 
 
 VisualChecklist = Literal[
     "dxf_outline",
     "part_render",
+    "assembly_render",
     "intake_image",
 ]
 
@@ -83,7 +79,7 @@ class VisualReviewDetail(BaseModel):
     )
     findings: list[VisualFinding] = Field(default_factory=lambda: list[VisualFinding]())
 
-    _check_impression = field_validator("impression")(_impression_is_prose)
+    _check_impression = field_validator("impression")(impression_is_prose)
 
 
 def parse_visual_review(result: AdvisoryResult) -> VisualReviewDetail | None:

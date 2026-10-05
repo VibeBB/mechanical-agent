@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .brief import DesignBrief
 from .gates import GateReport
@@ -40,8 +40,16 @@ def write_report(
     design: GeneratedDesign,
     gate_report: GateReport,
     out_dir: Path,
+    *,
+    renders: list[dict[str, Any]] | dict[str, Any] | None = None,
 ) -> Path:
     report = build_report(brief, design, gate_report)
+    if renders is not None:
+        # L2 advisory: renders never alter the verdict, they are listed so
+        # the review step knows which images need a vision review.
+        report["renders"] = (
+            {"status": "ok", "files": renders} if isinstance(renders, list) else renders
+        )
     lints: dict[str, Any] = {}
     for lint_path in sorted(out_dir.glob("*.dxf_lint.json")):
         with contextlib.suppress(json.JSONDecodeError):
@@ -89,6 +97,23 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {check['id']} | {check['subject']} | {check['status']} "
             f"| {measured} | {limit} | {check['detail']} |"
         )
+    renders: Any = report.get("renders")
+    if renders is not None:
+        lines += ["", "## Renders (advisory — review each)", ""]
+        renders_ok = (
+            isinstance(renders, dict) and cast(dict[str, Any], renders).get("status") == "ok"
+        )
+        if renders_ok:
+            files = cast(list[dict[str, Any]], cast(dict[str, Any], renders).get("files") or [])
+            for entry in files:
+                lines.append(f"- {entry['kind']}: `{entry['png_path']}` (from `{entry['source']}`)")
+        else:
+            detail = (
+                cast(dict[str, Any], renders).get("detail", "unknown")
+                if isinstance(renders, dict)
+                else renders
+            )
+            lines.append(f"- render error: {detail}")
     lints = report.get("advisories", {}).get("dxf_lint", {})
     if lints:
         lines += [

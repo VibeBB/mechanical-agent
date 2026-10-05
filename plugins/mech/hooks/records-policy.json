@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "plugin": "mech",
+  "records_dir": "observations/mech",
+  "artifact_globs": [
+    "**/*.brief.json",
+    "**/*.intake.json",
+    "**/design-report.json",
+    "**/design-report.md",
+    "**/*.envelope.json",
+    "**/*.step",
+    "**/*.stl",
+    "**/*.3mf",
+    "**/*.dxf",
+    "**/*.ux-response.json"
+  ],
+  "ignore_globs": ["examples/**", "tests/**", ".devin/**"],
+  "max_stop_denials": 2,
+  "record_hint": "Use the MCP tools mech_record_decision, mech_record_impression and mech_record_vision_review (or `python -m mech record decision|impression|vision-review --json <file>`). Impressions need at least 400 characters and 3 sentences: what you noticed, what works, what worries you, how a maker or user would read it, and what to do next."
+}

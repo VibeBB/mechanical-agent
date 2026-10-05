@@ -305,6 +305,59 @@ def _board_envelope_checks(brief: DesignBrief) -> list[GateCheck]:
     return checks
 
 
+# --- harness anchors --------------------------------------------------------
+
+
+_ANCHOR_TOL_MM = 1.0
+
+
+def _harness_anchor_checks(brief: DesignBrief, design: GeneratedDesign) -> list[GateCheck]:
+    """Declared anchors sit inside the assembly bbox (anchor frame = bbox min corner)."""
+    anchors = [a for a in brief.harness_anchors if a.position_mm is not None]
+    if not anchors:
+        return []
+    lo = [float("inf")] * 3
+    hi = [float("-inf")] * 3
+    try:
+        for part in design.parts:
+            box = part.shape.bounding_box()
+            for i, (mn, mx) in enumerate(
+                ((box.min.X, box.max.X), (box.min.Y, box.max.Y), (box.min.Z, box.max.Z))
+            ):
+                lo[i] = min(lo[i], float(mn))
+                hi[i] = max(hi[i], float(mx))
+    except Exception as exc:
+        return [
+            GateCheck(
+                "harness_anchor.within_envelope",
+                brief.name,
+                "unknown",
+                detail=f"assembly bbox failed: {exc}",
+            )
+        ]
+    size = [hi[i] - lo[i] for i in range(3)]
+    checks: list[GateCheck] = []
+    for anchor in anchors:
+        pos = anchor.position_mm
+        assert pos is not None
+        inside = all(-_ANCHOR_TOL_MM <= pos[i] <= size[i] + _ANCHOR_TOL_MM for i in range(3))
+        checks.append(
+            GateCheck(
+                "harness_anchor.within_envelope",
+                anchor.name,
+                "pass" if inside else "fail",
+                measured=round(max(pos), 4),
+                limit=round(max(size) + _ANCHOR_TOL_MM, 4),
+                detail=(
+                    f"position_mm {tuple(round(v, 3) for v in pos)} vs assembly "
+                    f"size {tuple(round(v, 3) for v in size)} mm (anchor frame = "
+                    "assembly bbox min corner)"
+                ),
+            )
+        )
+    return checks
+
+
 # --- openings and wall thickness ------------------------------------------
 
 
@@ -570,6 +623,7 @@ def run_gates(
     checks += _kernel_checks(design)
     checks += _interference_checks(design)
     checks += _board_envelope_checks(brief)
+    checks += _harness_anchor_checks(brief, design)
     checks += _opening_checks(brief, design)
     wall_checks = _wall_thickness_checks(brief, design)
     checks += wall_checks

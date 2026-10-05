@@ -68,8 +68,27 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
         raise RenderError(f"rasterizer failed: {exc}") from exc
 
 
-def _sha256(path: Path) -> str:
+def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def rasterize_svg(svg_path: Path, png_path: Path, dpi: int = 200) -> None:
+    """Rasterize `svg_path` to `png_path` with the system rsvg-convert binary."""
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    result = _run(
+        [
+            *_command(_RSVG_ENV, "rsvg-convert"),
+            "-d",
+            str(dpi),
+            str(svg_path),
+            "-o",
+            str(png_path),
+        ]
+    )
+    if result.returncode != 0 or not png_path.is_file():
+        raise RenderError(
+            f"rsvg-convert failed (exit {result.returncode}): {result.stderr.strip()}"
+        )
 
 
 def _dxf_to_svg(dxf_path: Path, svg_path: Path, *, margin_mm: float = 5.0) -> None:
@@ -102,11 +121,11 @@ def _dxf_to_svg(dxf_path: Path, svg_path: Path, *, margin_mm: float = 5.0) -> No
     svg_path.write_text(backend.get_string(page), encoding="utf-8")
 
 
-def _record_or_compare_baseline(
+def record_or_compare_baseline(
     png_path: Path, baseline_path: Path
 ) -> tuple[BaselineVerdict, str | None]:
     """Write or compare a sha256 visual baseline for `png_path`."""
-    image_sha = _sha256(png_path)
+    image_sha = sha256_file(png_path)
     if not baseline_path.is_file():
         record = {
             "image": str(png_path),
@@ -144,31 +163,17 @@ def render_dxf(
         raise RenderError("dpi must be positive")
     png_path = out_path or dxf_path.with_suffix(".png")
     svg_path = png_path.with_suffix(".svg")
-    png_path.parent.mkdir(parents=True, exist_ok=True)
     _dxf_to_svg(dxf_path, svg_path)
-    result = _run(
-        [
-            *_command(_RSVG_ENV, "rsvg-convert"),
-            "-d",
-            str(dpi),
-            str(svg_path),
-            "-o",
-            str(png_path),
-        ]
-    )
-    if result.returncode != 0 or not png_path.is_file():
-        raise RenderError(
-            f"rsvg-convert failed (exit {result.returncode}): {result.stderr.strip()}"
-        )
+    rasterize_svg(svg_path, png_path, dpi)
     baseline: BaselineVerdict | None = None
     baseline_sha: str | None = None
     if baseline_path is not None:
-        baseline, baseline_sha = _record_or_compare_baseline(png_path, baseline_path)
+        baseline, baseline_sha = record_or_compare_baseline(png_path, baseline_path)
     return RenderResult(
         dxf_path=str(dxf_path),
         svg_path=str(svg_path),
         png_path=str(png_path),
-        image_sha256=_sha256(png_path),
+        image_sha256=sha256_file(png_path),
         baseline=baseline,
         baseline_sha256=baseline_sha,
     )

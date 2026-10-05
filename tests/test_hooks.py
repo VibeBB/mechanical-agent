@@ -81,6 +81,26 @@ def test_protect_denies_artifact_writes() -> None:
             "tool_input": {"command": "write", "path": "out/design-report.json"},
         },
         {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "write", "path": "liaison/req-1.ux-response.json"},
+        },
+        {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "edit", "path": "observations/mech/decisions.jsonl"},
+        },
+        {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "write", "path": "observations/mech/impressions.jsonl"},
+        },
+        {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "edit", "path": "observations/mech/vision-reviews.jsonl"},
+        },
+        {
+            "tool_name": "file_editor",
+            "tool_input": {"command": "write", "path": "observations/mech/records-status.json"},
+        },
+        {
             "tool_name": "apply_patch",
             "tool_input": {"patch": "+++ b/out/casing.step"},
         },
@@ -134,6 +154,9 @@ def test_protect_denies_terminal_artifact_writes() -> None:
         "touch out.step",
         "rm out/provenance.json",
         "rm out/design-report.json",
+        "echo x > liaison/r.ux-response.json",
+        "rm observations/mech/decisions.jsonl",
+        "tee observations/mech/records-status.json",
         "python3 gen.py && cp x out.step",
         "cmd 2> err.dxf",
         "sudo rm manifest.json",

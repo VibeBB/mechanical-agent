@@ -2,18 +2,32 @@
 
 ## Guides
 
-- [architecture.md](architecture.md) — system structure, data flow, gate model
+- [architecture.md](architecture.md) — system structure, data flow, gate model, module reference — see also [reference.md](reference.md) for the per-module API index
+- [workflow.md](workflow.md) — the conversational design workflow: stages, handoffs, records left
+- [agents.md](agents.md) — the three task sub-agents and their contracts
+- [skills.md](skills.md) — every SKILL.md and when it triggers
+- [commands.md](commands.md) — `/mech:*` commands and the `python -m mech` CLI
+- [mcp.md](mcp.md) — every `mech_*` MCP tool: inputs, outputs, errors, read/write
+- [hooks.md](hooks.md) — every hook script, its event, and its behavior
+- [contracts.md](contracts.md) — every JSON schema this repo produces or consumes
+- [records-and-vision.md](records-and-vision.md) — VibeBB Record Protocol (VRP) and the vision lane for mech
+- [sister-cooperation.md](sister-cooperation.md) — Sister Liaison Protocol (SLP v2) and sister interchange
+- [performance-and-limits.md](performance-and-limits.md) — measured timings and hard limits from the code
 - [operations.md](operations.md) — runbook: verification, releases, dependency updates
 - [dependency-updates.md](dependency-updates.md) — adopted dependency versions and update decisions
+- [development.md](development.md) — hacking on this repo: layout, test conventions, guard tests
+- [improvement-notes.md](improvement-notes.md) — known gaps and follow-ups found during the refactor
 
 ## Research
 
 - [research/cad-kernels.md](research/cad-kernels.md) — CAD kernel survey and selection basis
 - [research/mechanical-domains.md](research/mechanical-domains.md) — mechanical design domain survey
+- [research/sdk-v1.49.5-feature-evaluation.md](research/sdk-v1.49.5-feature-evaluation.md) — OpenHands SDK and uv update decisions
+- [research/sdk-v1.49.6-feature-evaluation.md](research/sdk-v1.49.6-feature-evaluation.md) — OpenHands SDK and uv update decisions
 - [research/sdk-v1.50.0-feature-evaluation.md](research/sdk-v1.50.0-feature-evaluation.md) — OpenHands SDK and uv update decisions
-- [SDK v1.50.1 feature evaluation](research/sdk-v1.50.1-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
-- [SDK v1.51.0 feature evaluation](research/sdk-v1.51.0-feature-evaluation.md) — OpenHands SDK/tools/uv adoption decisions
-- [SDK v1.52.0 feature evaluation](research/sdk-v1.52.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
+- [research/sdk-v1.50.1-feature-evaluation.md](research/sdk-v1.50.1-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
+- [research/sdk-v1.51.0-feature-evaluation.md](research/sdk-v1.51.0-feature-evaluation.md) — OpenHands SDK/tools/uv adoption decisions
+- [research/sdk-v1.52.0-feature-evaluation.md](research/sdk-v1.52.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 
 ## Accepted ADRs
 
@@ -23,3 +37,4 @@
 - [adr/ADR-0004-intake-attachment-materialization-and-evidence-binding.md](adr/ADR-0004-intake-attachment-materialization-and-evidence-binding.md) — intake attachment materialization and evidence binding
 - [adr/ADR-0005-vision-render-and-review-records.md](adr/ADR-0005-vision-render-and-review-records.md) — DXF→PNG render, visual baseline, typed visual-review records
 - [adr/ADR-0006-attest-published-tools-images.md](adr/ADR-0006-attest-published-tools-images.md) — attest published tools images and verify provenance for locked tools
+- [adr/ADR-0007-vibebb-records-vision-liaison.md](adr/ADR-0007-vibebb-records-vision-liaison.md) — VRP v1 port, STEP views vision point, SLP v2 liaison, envelope provenance sidecar
