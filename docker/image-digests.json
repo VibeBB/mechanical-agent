@@ -1,10 +1,10 @@
 {
   "mech_server": {
-    "digest": "sha256:a3a3698ceb6830d07a3a4b3aa40a0cefc87b791a8d192ad961be774d7e8127f9",
-    "dockerfile": "sdk:openhands-agent-server/v1.51.0",
+    "digest": "sha256:5edbe61b5eb68dd4c2f03900c7fb9a7d350fe5a42958a9e4fc1e52a03af9a878",
+    "dockerfile": "sdk:openhands-agent-server/v1.52.0",
     "image": "ghcr.io/vibebb/mech-server",
-    "published_at": "2026-10-04T04:32:32Z",
-    "tag": "2d52385-_tag_2b9aacabda45515ce3342de8382f9c724c5d3b64cdf115-b83a387bcf2b-source",
+    "published_at": "2026-10-05T12:50:20Z",
+    "tag": "ddf6c38-_tag_8774462f54cda2fd6c2d6976f17f234dfc9f176fcef7da-f00caf500912-source",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
@@ -12,16 +12,16 @@
       "python": "Python 3.14.8",
       "uv": "0.12.23 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37176648076"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37310339901"
   },
   "mech_tools": {
-    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52521416",
-    "digest": "sha256:2b9aacabda45515ce3342de8382f9c724c5d3b64cdf1154d8313b97b3229ba13",
+    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52823479",
+    "digest": "sha256:8774462f54cda2fd6c2d6976f17f234dfc9f176fcef7da0c353e18a50f6c74bb",
     "dockerfile": "docker/mech-tools.Dockerfile",
     "image": "ghcr.io/vibebb/mech-tools",
-    "published_at": "2026-10-04T04:32:32Z",
-    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52521510",
-    "tag": "2d523851284108db4ab6bc171d1a995ca7c4009c-tools",
+    "published_at": "2026-10-05T12:50:20Z",
+    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/52823597",
+    "tag": "ddf6c38157b53abfbdb15460e8d0adb2f63356c9-tools",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
@@ -29,6 +29,6 @@
       "python": "Python 3.14.8",
       "uv": "0.12.23 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37176648076"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37310339901"
   }
 }
