@@ -225,6 +225,7 @@ def test_mcp_tool_annotations():
         "mech_author",
         "mech_gates",
         "mech_export_envelope",
+        "mech_board_import",
         "mech_dxf_lint",
         "mech_render",
         "mech_render_views",

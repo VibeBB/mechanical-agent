@@ -38,7 +38,7 @@ from .standards import (
     MATERIALS,
     PROCESS_LIMITS,
 )
-from .workspace import reject_symlinks, workspace_path
+from .workspace import reject_symlinks, workspace_path, workspace_root
 
 server: Server = Server(f"mech-mcp/{__version__}")
 
@@ -122,6 +122,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
             "out_path": {"type": "string"},
         },
         "required": ["brief", "out_path"],
+        "additionalProperties": False,
+    },
+    "mech_board_import": {
+        "type": "object",
+        "properties": {
+            "geometry_path": {"type": "string"},
+            "source_path": {"type": "string"},
+        },
+        "required": ["geometry_path"],
         "additionalProperties": False,
     },
     "mech_dxf_lint": {
@@ -216,6 +225,10 @@ _DESCRIPTIONS = {
     "mech_gates": "Regenerate the design and re-run all gates against out_dir artifacts.",
     "mech_export_envelope": (
         "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
+    ),
+    "mech_board_import": (
+        "Derive the enclosure board block (size, keepout, mount holes, hash pin) and "
+        "connector opening targets from a circuit *.board-geometry.json."
     ),
     "mech_dxf_lint": "Advisory readability lint for a DXF drawing (never a gate verdict).",
     "mech_render": (
@@ -354,7 +367,14 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     design = generate(brief)
     if name == "mech_author":
         export_design(brief, design, out_dir)
-    report = run_gates(brief, design, out_dir)
+    from .board_geometry import resolve_source
+
+    report = run_gates(
+        brief,
+        design,
+        out_dir,
+        board_geometry_path=resolve_source(brief, workspace_root(), confine=True),
+    )
     renders: list[dict[str, Any]] | dict[str, Any] | None = None
     if name == "mech_author" and bool(arguments.get("render", True)):
         from .render import RenderError
@@ -439,6 +459,15 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             intake = Intake.model_validate(arguments["intake"])
             report = check_intake(brief, intake, Path("<inline>"), Path("<inline>"))
             return _ok(report.model_dump(mode="json"))
+        if name == "mech_board_import":
+            from .board_geometry import load_geometry, sha256_file, suggest_board
+
+            geometry_path = _path_arg(arguments, "geometry_path")
+            source = arguments.get("source_path") or str(arguments["geometry_path"])
+            suggestion = suggest_board(
+                load_geometry(geometry_path), str(source), sha256_file(geometry_path)
+            )
+            return _ok({"verdict": "pass", **suggestion})
         if name == "mech_export_envelope":
             from .brief import DesignBrief
             from .envelope import write_envelope
@@ -561,6 +590,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_author": _anno("Author design", write=True),
     "mech_gates": _anno("Re-run gates", write=True),
     "mech_export_envelope": _anno("Export envelope contract", write=True),
+    "mech_board_import": _anno("Board geometry import", write=False),
     "mech_dxf_lint": _anno("DXF lint", write=False),
     "mech_render": _anno("Render DXF to PNG", write=True),
     "mech_render_views": _anno("Render STEP views sheet", write=True),

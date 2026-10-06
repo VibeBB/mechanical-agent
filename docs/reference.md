@@ -96,6 +96,15 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
   `{kind, source, png_path, image_sha256}` — renders every DXF + a views
   sheet per STEP; raises `RenderError` on the first failure.
 
+## board_geometry.py
+
+- `BoardGeometry` — strict mirror of circuit's `circuit_board_geometry` v1.
+- `load_geometry(path)`, `sha256_file(path)`,
+  `resolve_source(brief, base_dir, *, confine=False)` → pinned path or `None`.
+- `suggest_board(geometry, source_path, sha256)` → `{board, connector_openings}`;
+  raises `ValueError` on an incomplete geometry.
+- `along_span(component)` → face-local courtyard span less 0.25 mm.
+
 ## advisory.py / records.py / liaison.py / envelope.py
 
 - `build_review_record` / `write_review_record` → `review-visual-<slug>

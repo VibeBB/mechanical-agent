@@ -305,6 +305,134 @@ def _board_envelope_checks(brief: DesignBrief) -> list[GateCheck]:
     return checks
 
 
+# --- circuit board geometry ------------------------------------------------
+
+
+def _board_geometry_checks(brief: DesignBrief, geometry_path: Path | None) -> list[GateCheck]:
+    from .board_geometry import (
+        DIMENSION_TOL_MM,
+        HOLE_TOL_MM,
+        along_span,
+        load_geometry,
+        sha256_file,
+    )
+
+    spec = brief.enclosure
+    if spec is None or spec.board is None or spec.board.source is None:
+        return []
+    board, source = spec.board, spec.board.source
+    if geometry_path is None or not geometry_path.is_file():
+        return [GateCheck("board_geometry", "source", "unknown", detail="pinned geometry missing")]
+    actual = sha256_file(geometry_path)
+    if actual != source.sha256:
+        return [
+            GateCheck(
+                "board_geometry",
+                "source",
+                "fail",
+                detail=f"stale pin: file sha256 {actual} != brief {source.sha256}",
+            )
+        ]
+    try:
+        geometry = load_geometry(geometry_path)
+    except ValueError as exc:
+        return [GateCheck("board_geometry", "source", "unknown", detail=str(exc))]
+    if geometry.verdict != "pass":
+        return [
+            GateCheck(
+                "board_geometry",
+                "source",
+                "unknown",
+                detail=f"circuit geometry incomplete: {geometry.unknown}",
+            )
+        ]
+    checks = [GateCheck("board_geometry", "source", "pass", detail=geometry.pcb.sha256)]
+    for subject, declared, measured in (
+        ("width", board.width_mm, geometry.width_mm),
+        ("depth", board.depth_mm, geometry.depth_mm),
+        ("thickness", board.thickness_mm, geometry.thickness_mm),
+    ):
+        assert measured is not None
+        checks.append(
+            GateCheck(
+                "board_geometry",
+                subject,
+                "pass" if abs(declared - measured) <= DIMENSION_TOL_MM + 1e-9 else "fail",
+                measured=measured,
+                limit=declared,
+                detail="brief board vs circuit Edge.Cuts/stackup",
+            )
+        )
+    top = geometry.max_height_top_mm or 0.0
+    checks.append(
+        GateCheck(
+            "board_geometry",
+            "keepout_height",
+            "pass" if board.keepout_height_mm + 1e-9 >= top else "fail",
+            measured=top,
+            limit=board.keepout_height_mm,
+            detail="tallest top-side part vs brief keepout",
+        )
+    )
+    unmatched = [
+        hole.ref
+        for hole in geometry.mount_holes
+        if not any(
+            abs(hole.x_mm - mh.x_mm) <= HOLE_TOL_MM + 1e-9
+            and abs(hole.y_mm - mh.y_mm) <= HOLE_TOL_MM + 1e-9
+            and abs(hole.diameter_mm - mh.diameter_mm) <= HOLE_TOL_MM + 1e-9
+            for mh in board.mount_holes
+        )
+    ]
+    holes_ok = not unmatched and len(board.mount_holes) == len(geometry.mount_holes)
+    checks.append(
+        GateCheck(
+            "board_geometry",
+            "mount_holes",
+            "pass" if holes_ok else "fail",
+            measured=len(geometry.mount_holes),
+            limit=len(board.mount_holes),
+            detail=f"unmatched circuit holes: {unmatched}" if unmatched else "hole sets match",
+        )
+    )
+    board_bottom = spec.floor_mm + spec.standoff_height_mm
+    board_top = board_bottom + board.thickness_mm
+    for part in geometry.components:
+        if not part.connector or part.edge is None or part.bbox_mm is None:
+            continue
+        assert part.height_mm is not None
+        low, high = along_span(part)
+        z0, z1 = (
+            (board_top, board_top + part.height_mm)
+            if part.side == "top"
+            else (board_bottom - part.height_mm, board_bottom)
+        )
+        served = False
+        for opening in spec.openings:
+            if opening.face != part.edge:
+                continue
+            span_z = opening.height_mm if opening.kind == "rect" else opening.width_mm
+            oz = spec.height_mm / 2 + opening.center_y_mm
+            covers = (
+                opening.center_x_mm - opening.width_mm / 2 <= low + 1e-9
+                and opening.center_x_mm + opening.width_mm / 2 >= high - 1e-9
+            )
+            if covers and min(oz + span_z / 2, z1) - max(oz - span_z / 2, z0) > 0:
+                served = True
+        checks.append(
+            GateCheck(
+                "board_geometry",
+                f"connector:{part.ref}",
+                "pass" if served else "fail",
+                detail=(
+                    f"{part.edge} face opening must span {low:g}..{high:g} mm and "
+                    f"z {z0:g}..{z1:g} mm"
+                ),
+            )
+        )
+    return checks
+
+
 # --- harness anchors --------------------------------------------------------
 
 
@@ -618,11 +746,13 @@ def run_gates(
     out_dir: Path,
     *,
     include_artifacts: bool = True,
+    board_geometry_path: Path | None = None,
 ) -> GateReport:
     checks: list[GateCheck] = []
     checks += _kernel_checks(design)
     checks += _interference_checks(design)
     checks += _board_envelope_checks(brief)
+    checks += _board_geometry_checks(brief, board_geometry_path)
     checks += _harness_anchor_checks(brief, design)
     checks += _opening_checks(brief, design)
     wall_checks = _wall_thickness_checks(brief, design)

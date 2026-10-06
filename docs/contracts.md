@@ -64,6 +64,17 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
 
 ## Sister contracts
 
+- `*.board-geometry.json` (consumed) — circuit-agent `circuit_board_geometry`
+  v1, mirrored strictly in `src/mech/board_geometry.py`. Pin it with
+  `enclosure.board.source {path, sha256}` (path relative to the brief, or
+  to the workspace for MCP). The `board_geometry` gate checks, in the shared
+  board-centred frame (front = -y): file hash = pin (else `fail`), circuit
+  verdict `pass` (else `unknown`), width/depth/thickness within 0.05 mm,
+  `keepout_height_mm` ≥ tallest top-side part, a 1:1 mount-hole match
+  within 0.05 mm, and for every edge connector an opening on that face
+  spanning its courtyard (less the 0.25 mm IPC excess) and overlapping its
+  z range above (top) or below (bottom) the board.
+
 - `*.envelope.json` — wire-agent `EnvelopeSource`: `{schema_version: 1,
   system: "mech", anchors: [{name, kind, position_mm?}]}` (unchanged —
   wire validates strict).

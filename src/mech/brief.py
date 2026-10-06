@@ -57,6 +57,15 @@ class MountHole(BaseModel):
     diameter_mm: float = Field(gt=0)
 
 
+class BoardGeometrySource(BaseModel):
+    """Hash pin of a circuit-agent ``*.board-geometry.json`` the board mirrors."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class BoardSpec(BaseModel):
     """Internal PCB that the enclosure must clear."""
 
@@ -67,6 +76,7 @@ class BoardSpec(BaseModel):
     thickness_mm: float = Field(gt=0, default=1.6)
     keepout_height_mm: float = Field(ge=0, default=0.0)
     mount_holes: list[MountHole] = Field(default_factory=list[MountHole])
+    source: BoardGeometrySource | None = None
 
 
 class VentSpec(BaseModel):

@@ -142,6 +142,8 @@ geometry yet).
   `event_ids` — mech-local JSONL reader used by liaison/envelope).
 - `liaison.py` — SLP v2 (`UXRequestV2`/`UXResponseV2`, `ux_inbox`,
   `ux_respond`, `liaison_dir`).
+- `board_geometry.py` — strict mirror of circuit's board geometry,
+  `resolve_source`, `suggest_board`; checks live in `gates.py`.
 - `envelope.py` — `envelope_source`, `write_envelope` (envelope +
   provenance sidecar).
 - `report.py` — `write_report` design-report.json/md.
