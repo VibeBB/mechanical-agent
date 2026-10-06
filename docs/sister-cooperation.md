@@ -79,6 +79,14 @@ the connector opening targets; the agent authors the openings. The
 `board_geometry` gate then fails on a stale pin or any drift between the
 brief and the board (see `contracts.md`).
 
+## Ruggedness → simulation
+
+`sim-request` / `mech_sim_request` turns `enclosure.ruggedness` into a
+simulation brief (board plate, vibration parts, drop pulse, IP code with the
+opening sizes) and a `kind: ruggedness` `*.sim-request.json`. simulation's
+`sim-liaison` answers with a `*.sim-response.json`; its gates own the
+verdict (dust and water IP digits stay `unknown` until a physical test).
+
 ## Envelope → wire
 
 `export-envelope` / `mech_export_envelope` emits `<name>.envelope.json`

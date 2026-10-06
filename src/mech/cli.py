@@ -9,6 +9,7 @@ Subcommands:
   render          rasterize an exported DXF to PNG for the advisory vision lane
   render-views    project a STEP file to a 2x2 views sheet (SVG + PNG)
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
+  sim-request     emit a simulation-agent ruggedness brief + request (drop/vibration/IP)
   review-record   write a validated visual-review advisory JSON for an image
   record          append a VibeBB Record Protocol record (decision, impression,
                   vision-review) or print the records status
@@ -47,6 +48,17 @@ def _emit_doctor(args: argparse.Namespace) -> int:
     payload = run_doctor()
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if args.warn or payload.get("verdict") in ("pass", "ready") else 1
+
+
+def _cmd_sim_request(args: argparse.Namespace) -> dict[str, Any]:
+    from .sim_request import write_sim_request
+
+    try:
+        brief = load_brief(Path(args.brief))
+        root = Path(args.workspace) if args.workspace else None
+        return write_sim_request(brief, Path(args.out_dir), root=root)
+    except Exception as exc:
+        return {"verdict": "fail", "stage": "sim-request", "detail": str(exc)}
 
 
 def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
@@ -379,6 +391,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="optional baseline JSON: recorded when missing, compared when present",
     )
 
+    sim_request_p = sub.add_parser(
+        "sim-request",
+        help="emit a simulation-agent ruggedness brief and request",
+    )
+    sim_request_p.add_argument("--brief", required=True)
+    sim_request_p.add_argument("--out-dir", required=True)
+    sim_request_p.add_argument(
+        "--workspace",
+        default=None,
+        help="workspace root the request's brief_path is made relative to",
+    )
+
     envelope_p = sub.add_parser(
         "export-envelope",
         help="emit the wire-agent envelope contract",
@@ -462,6 +486,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers = {
         "doctor": _cmd_doctor,
         "export-envelope": _cmd_export_envelope,
+        "sim-request": _cmd_sim_request,
         "intake": _cmd_intake,
         "author": _cmd_author,
         "export": _cmd_export,

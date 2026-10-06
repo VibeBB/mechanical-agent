@@ -105,6 +105,14 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
   raises `ValueError` on an incomplete geometry.
 - `along_span(component)` → face-local courtyard span less 0.25 mm.
 
+## sim_request.py
+
+- `opening_min_dims(enclosure)` → IP probe size of every opening and vent slot.
+- `ruggedness_brief(brief)` → simulation `*.sim.json` payload; raises
+  `ValueError` without `enclosure.ruggedness` or, for vibration, a board.
+- `write_sim_request(brief, out_dir, *, root=None)` → writes the brief and
+  `*.sim-request.json`; `root` makes `brief_path` workspace-relative.
+
 ## advisory.py / records.py / liaison.py / envelope.py
 
 - `build_review_record` / `write_review_record` → `review-visual-<slug>

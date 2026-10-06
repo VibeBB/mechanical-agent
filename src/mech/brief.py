@@ -106,6 +106,72 @@ class LidScrew(BaseModel):
         return self
 
 
+class RuggedBoardMaterial(BaseModel):
+    """Board laminate and populated mass for the simulation plate model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    youngs_mpa: float = Field(gt=0)
+    poisson: float = Field(gt=-1, lt=0.5)
+    density_kg_m3: float = Field(gt=0)
+    component_mass_g: float = Field(ge=0)
+
+
+class RuggedPart(BaseModel):
+    """Vibration-critical part in board-local coordinates (origin: board centre)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str = Field(min_length=1)
+    x_mm: float
+    y_mm: float
+    length_mm: float = Field(gt=0)
+    parallel_to: Literal["width", "depth"]
+    steinberg_c: float = Field(gt=0)
+
+
+class RuggedVibration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    psd_g2_hz: float = Field(gt=0)
+    q: float | None = Field(default=None, gt=0)
+    min_fn_hz: float | None = Field(default=None, gt=0)
+    parts: list[RuggedPart] = Field(min_length=1)
+
+
+class RuggedDrop(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    height_mm: float = Field(gt=0)
+    pulse_ms: float = Field(gt=0)
+    restitution: float = Field(ge=0, le=1)
+    max_shock_g: float = Field(gt=0)
+
+
+class RuggednessSpec(BaseModel):
+    """Drop, vibration, and IP targets handed to simulation-agent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    board_material: RuggedBoardMaterial | None = None
+    vibration: RuggedVibration | None = None
+    drop: RuggedDrop | None = None
+    ip_code: str | None = Field(default=None, pattern=r"^IP[0-6X][0-9X]$")
+    sealed: bool = False
+
+    @model_validator(mode="after")
+    def validate_targets(self) -> RuggednessSpec:
+        if self.vibration is None and self.drop is None and self.ip_code is None:
+            raise ValueError("ruggedness needs vibration, drop, or ip_code")
+        if self.vibration is not None:
+            if self.board_material is None:
+                raise ValueError("ruggedness vibration needs board_material")
+            refs = [part.ref for part in self.vibration.parts]
+            if len(set(refs)) != len(refs):
+                raise ValueError("ruggedness part refs must be unique")
+        return self
+
+
 class EnclosureSpec(BaseModel):
     """Two-piece clamshell enclosure around an optional internal board."""
 
@@ -124,6 +190,7 @@ class EnclosureSpec(BaseModel):
     openings: list[Opening] = Field(default_factory=list[Opening])
     vent: VentSpec | None = None
     screw: LidScrew | None = None
+    ruggedness: RuggednessSpec | None = None
 
     @model_validator(mode="after")
     def validate_geometry(self) -> EnclosureSpec:
