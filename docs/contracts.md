@@ -75,6 +75,21 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   spanning its courtyard (less the 0.25 mm IPC excess) and overlapping its
   z range above (top) or below (bottom) the board.
 
+- `enclosure.ruggedness` (`RuggednessSpec`, authored) — `board_material`
+  (`youngs_mpa`, `poisson`, `density_kg_m3`, `component_mass_g`; required
+  with `vibration`), `vibration` (`psd_g2_hz`, `q?`, `min_fn_hz?`,
+  `parts[]` of `ref`/`x_mm`/`y_mm` (board-local)/`length_mm`/`parallel_to`/
+  `steinberg_c`, refs unique), `drop` (`height_mm`, `pulse_ms`,
+  `restitution` 0–1, `max_shock_g`), `ip_code` (`IP[0-6X][0-9X]`) and
+  `sealed`; at least one of vibration, drop, ip_code.
+- `*.ruggedness.sim.json` / `*.ruggedness.sim-request.json` (produced) —
+  simulation-agent brief v1 with a `ruggedness` section (plate size and
+  thickness from `enclosure.board`; `openings_min_mm` = the smaller side of
+  each rect opening, the diameter of each round one, and the vent slot
+  width) and a v1 `SimulationRequest` (`from_system: mech`,
+  `kind: ruggedness`, `request_id` = `<name>-ruggedness-<brief sha256[:12]>`).
+  Mech does not judge ruggedness; simulation's gates do.
+
 - `*.envelope.json` — wire-agent `EnvelopeSource`: `{schema_version: 1,
   system: "mech", anchors: [{name, kind, position_mm?}]}` (unchanged —
   wire validates strict).

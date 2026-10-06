@@ -146,6 +146,8 @@ geometry yet).
   `resolve_source`, `suggest_board`; checks live in `gates.py`.
 - `envelope.py` — `envelope_source`, `write_envelope` (envelope +
   provenance sidecar).
+- `sim_request.py` — `ruggedness_brief`, `write_sim_request`,
+  `opening_min_dims` (simulation-agent ruggedness handoff).
 - `report.py` — `write_report` design-report.json/md.
 - `doctor.py` — `run_doctor` environment probe.
 - `mcp_server.py` — stdio MCP boundary (tool schemas, dispatch,
