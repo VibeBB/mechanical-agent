@@ -147,9 +147,10 @@ uv run python scripts/verify_all.py --stage fast   # default before PR
 `verify_all.py` runs barrier-marked commands alone and consecutive
 non-barrier commands in parallel up to `--jobs` workers; `--list` dumps the
 machine-readable command table. `--group`, `--match`, and `--shard K/N`
-select command subsets so CI can spread one stage across jobs. The fast stage runs pytest with `--cov` and
-`--cov-report=term-missing:skip-covered`; coverage measures `src/mech` with
-branches disabled and an 83% minimum. pytest runs `-n auto --dist loadgroup`;
+select command subsets so CI can spread one stage across jobs. The fast stage runs pytest through
+`scripts/structural_coverage.py run`; coverage measures `src/mech` with
+branches and gates the C0, C1, decision, C2, MC/DC and boundary floors in
+`pyproject.toml` (`docs/test-coverage.md`). pytest runs `-n auto --dist loadgroup`;
 use `uv run pytest -n 0` for single-test debugging.
 
 ## Git

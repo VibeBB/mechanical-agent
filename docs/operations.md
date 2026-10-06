@@ -25,9 +25,10 @@ uv run python scripts/verify_all.py --stage fast
 uv run python scripts/verify_all.py --stage docs --jobs 1   # sequential, streamed
 ```
 
-The fast stage runs pytest with `--cov --cov-report=term-missing:skip-covered`;
-coverage measures `src/mech`, disables branch coverage, and enforces an 83%
-minimum. pytest runs `-n auto --dist loadgroup` by default; `-n 0` for
+The fast stage runs pytest through `scripts/structural_coverage.py run`;
+coverage measures `src/mech` with branches and gates the C0, C1, decision,
+C2, MC/DC and boundary floors in `pyproject.toml`
+([test-coverage.md](test-coverage.md)). pytest runs `-n auto --dist loadgroup` by default; `-n 0` for
 single-test debugging. Keep collection counts, verdicts, and normalized hashes
 identical between parallel and sequential runs.
 

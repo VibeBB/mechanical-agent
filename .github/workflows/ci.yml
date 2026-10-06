@@ -71,9 +71,9 @@ jobs:
       - name: Pytest
         id: pytest
         continue-on-error: ${{ matrix.experimental || false }}
-        # Same flags as `verify_all.py --stage fast` so the 83% coverage
-        # floor ([tool.coverage.report] fail_under) gates CI too.
-        run: uv run pytest --cov --cov-report=term-missing:skip-covered
+        # Same command as `verify_all.py --stage fast` so fail_under and the
+        # [tool.vibebb-coverage] structural floors gate CI too.
+        run: uv run python scripts/structural_coverage.py run --json out/structural-coverage.json
       - name: Docs
         id: docs
         continue-on-error: ${{ matrix.experimental || false }}

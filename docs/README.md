@@ -16,6 +16,7 @@
 - [operations.md](operations.md) — runbook: verification, releases, dependency updates
 - [dependency-updates.md](dependency-updates.md) — adopted dependency versions and update decisions
 - [development.md](development.md) — hacking on this repo: layout, test conventions, guard tests
+- [Test coverage and test design](test-coverage.md) — C0/C1/C2/MCC/MC/DC and boundary coverage, floors, test-design techniques
 - [improvement-notes.md](improvement-notes.md) — known gaps and follow-ups found during the refactor
 
 ## Research
@@ -39,3 +40,4 @@
 - [adr/ADR-0006-attest-published-tools-images.md](adr/ADR-0006-attest-published-tools-images.md) — attest published tools images and verify provenance for locked tools
 - [adr/ADR-0007-vibebb-records-vision-liaison.md](adr/ADR-0007-vibebb-records-vision-liaison.md) — VRP v1 port, STEP views vision point, SLP v2 liaison, envelope provenance sidecar
 - [adr/ADR-0008-iso7200-title-block.md](adr/ADR-0008-iso7200-title-block.md) — ISO 7200 DXF title block sourced from `brief.drawing`, derived document status, brief digest
+- [adr/ADR-0009-structural-coverage.md](adr/ADR-0009-structural-coverage.md) — structural coverage gate (C0, C1, C2, MC/DC, boundaries)

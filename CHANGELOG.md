@@ -20,6 +20,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- ISO 286 fits with `H10` or `H11` holes, which the brief schema accepts,
+  now evaluate instead of always reporting `unknown`: the hole-class parser
+  read only one grade digit.
 - `scripts/check_plugin_load.py` now asserts `post_tool_use` hooks (previously
   collected but unchecked) and renders the OK summary from the actual expected
   asset sets instead of a stale hardcoded string.

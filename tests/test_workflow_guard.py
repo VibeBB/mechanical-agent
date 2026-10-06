@@ -117,11 +117,12 @@ def test_publish_never_pushes_latest_before_the_trivy_gate() -> None:
 def test_ci_pytest_enforces_the_coverage_floor() -> None:
     data = _load("ci.yml")
     steps: list[dict[Any, Any]] = data["jobs"]["verify"]["steps"]
-    pytest_step = next(s for s in steps if (s.get("run") or "").startswith("uv run pytest"))
-    run: str = pytest_step.get("run") or ""
-    assert "--cov" in run, (
-        "ci.yml must run pytest with the same --cov flags as verify_all "
-        "so the [tool.coverage.report] fail_under floor gates CI"
+    runs = [s.get("run") or "" for s in steps]
+    assert any(r.startswith("uv run python scripts/verify_all.py") for r in runs) or any(
+        r.startswith("uv run python scripts/structural_coverage.py run") for r in runs
+    ), (
+        "ci.yml must run pytest through scripts/structural_coverage.py so the "
+        "fail_under and [tool.vibebb-coverage] floors gate CI"
     )
 
 
