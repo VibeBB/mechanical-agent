@@ -305,6 +305,23 @@ def _board_envelope_checks(brief: DesignBrief) -> list[GateCheck]:
     return checks
 
 
+# --- simulation ruggedness response ---------------------------------------
+
+
+def _sim_ruggedness_checks(
+    brief: DesignBrief, response_path: Path | None, root: Path | None
+) -> list[GateCheck]:
+    from .sim_response import ruggedness_findings
+    from .workspace import workspace_root
+
+    return [
+        GateCheck("sim_ruggedness", subject, status, measured=measured, detail=detail)
+        for subject, status, measured, detail in ruggedness_findings(
+            brief, response_path, root or workspace_root()
+        )
+    ]
+
+
 # --- circuit board geometry ------------------------------------------------
 
 
@@ -747,12 +764,15 @@ def run_gates(
     *,
     include_artifacts: bool = True,
     board_geometry_path: Path | None = None,
+    sim_response_path: Path | None = None,
+    workspace: Path | None = None,
 ) -> GateReport:
     checks: list[GateCheck] = []
     checks += _kernel_checks(design)
     checks += _interference_checks(design)
     checks += _board_envelope_checks(brief)
     checks += _board_geometry_checks(brief, board_geometry_path)
+    checks += _sim_ruggedness_checks(brief, sim_response_path, workspace)
     checks += _harness_anchor_checks(brief, design)
     checks += _opening_checks(brief, design)
     wall_checks = _wall_thickness_checks(brief, design)

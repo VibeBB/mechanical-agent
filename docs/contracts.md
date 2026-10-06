@@ -81,7 +81,10 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   `parts[]` of `ref`/`x_mm`/`y_mm` (board-local)/`length_mm`/`parallel_to`/
   `steinberg_c`, refs unique), `drop` (`height_mm`, `pulse_ms`,
   `restitution` 0–1, `max_shock_g`), `ip_code` (`IP[0-6X][0-9X]`) and
-  `sealed`; at least one of vibration, drop, ip_code.
+  `sealed`; at least one of vibration, drop, ip_code. `response_path?`
+  points at simulation's `*.sim-response.json` (relative to the brief, or to
+  the workspace for MCP); it is not part of the simulation brief, so moving
+  it does not change the request.
 - `*.ruggedness.sim.json` / `*.ruggedness.sim-request.json` (produced) —
   simulation-agent brief v1 with a `ruggedness` section (plate size and
   thickness from `enclosure.board`; `openings_min_mm` = the smaller side of
@@ -89,6 +92,19 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   width) and a v1 `SimulationRequest` (`from_system: mech`,
   `kind: ruggedness`, `request_id` = `<name>-ruggedness-<brief sha256[:12]>`).
   Mech does not judge ruggedness; simulation's gates do.
+- `*.ruggedness.sim-response.json` (consumed) — simulation-agent
+  `SimulationResponse` v2, mirrored strictly in `src/mech/sim_response.py`.
+  The `sim_ruggedness` gate checks, in order (first miss wins): response set
+  and present, valid (`accepted` ⇔ pass, `rejected` ⇔ fail, hashed report),
+  the sibling `*.sim-request.json` still hashes to `request_sha256` and is a
+  `mech`/`ruggedness` request, `request_id` and `brief_sha256` equal what the
+  *current* brief would request (else stale → `fail`), status not
+  `needs_info`/`deferred` (else `unknown`), and the report under the
+  workspace still hashes to `sha256` with a verdict equal to the response.
+  It then reports each simulation `ruggedness.*` check as
+  `sim_ruggedness:<check>` with simulation's verdict, measured value and
+  limit — a simulation `fail`/`unknown` is never promoted. Without
+  `enclosure.ruggedness` the gate emits nothing.
 
 - `*.envelope.json` — wire-agent `EnvelopeSource`: `{schema_version: 1,
   system: "mech", anchors: [{name, kind, position_mm?}]}` (unchanged —

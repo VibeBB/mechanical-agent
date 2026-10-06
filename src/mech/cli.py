@@ -107,6 +107,12 @@ def _geometry_path(brief: DesignBrief, brief_path: str) -> Path | None:
     return resolve_source(brief, Path(brief_path).parent)
 
 
+def _sim_response_path(brief: DesignBrief, brief_path: str) -> Path | None:
+    from .sim_response import resolve_response
+
+    return resolve_response(brief, Path(brief_path).parent)
+
+
 def _cmd_board_import(args: argparse.Namespace) -> dict[str, Any]:
     from .board_geometry import load_geometry, sha256_file, suggest_board
 
@@ -140,7 +146,11 @@ def _cmd_author(args: argparse.Namespace) -> dict[str, Any]:
         return {"verdict": "fail", "stage": "generate", "detail": str(exc)}
     export_design(brief, design, out_dir)
     gate_report = run_gates(
-        brief, design, out_dir, board_geometry_path=_geometry_path(brief, args.brief)
+        brief,
+        design,
+        out_dir,
+        board_geometry_path=_geometry_path(brief, args.brief),
+        sim_response_path=_sim_response_path(brief, args.brief),
     )
     renders: list[dict[str, Any]] | dict[str, Any] | None = None
     if not args.no_render:
@@ -206,7 +216,11 @@ def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
     except Exception as exc:
         return {"verdict": "fail", "stage": "generate", "detail": str(exc)}
     gate_report = run_gates(
-        brief, design, out_dir, board_geometry_path=_geometry_path(brief, args.brief)
+        brief,
+        design,
+        out_dir,
+        board_geometry_path=_geometry_path(brief, args.brief),
+        sim_response_path=_sim_response_path(brief, args.brief),
     )
     report_path = write_report(brief, design, gate_report, out_dir)
     result = gate_report.to_dict(brief)

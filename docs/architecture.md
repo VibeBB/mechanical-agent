@@ -148,6 +148,9 @@ geometry yet).
   provenance sidecar).
 - `sim_request.py` — `ruggedness_brief`, `write_sim_request`,
   `opening_min_dims` (simulation-agent ruggedness handoff).
+- `sim_response.py` — strict mirror of simulation's response,
+  `resolve_response`, `ruggedness_findings`; the `sim_ruggedness` check
+  lives in `gates.py`.
 - `report.py` — `write_report` design-report.json/md.
 - `doctor.py` — `run_doctor` environment probe.
 - `mcp_server.py` — stdio MCP boundary (tool schemas, dispatch,

@@ -158,6 +158,7 @@ class RuggednessSpec(BaseModel):
     drop: RuggedDrop | None = None
     ip_code: str | None = Field(default=None, pattern=r"^IP[0-6X][0-9X]$")
     sealed: bool = False
+    response_path: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_targets(self) -> RuggednessSpec:
