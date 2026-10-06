@@ -62,7 +62,9 @@ def _answer(
     """Play simulation-agent: write request (mech), report and response (sim)."""
     out = write_sim_request(brief, root / "sim", root=root)
     request_path = Path(out["request"])
-    rows = [{"analysis": "ruggedness", "detail": "", "evidence": [], **c} for c in checks]
+    rows: list[dict[str, Any]] = [
+        {"analysis": "ruggedness", "detail": "", "evidence": [], **c} for c in checks
+    ]
     aggregate = (
         "fail"
         if any(c["verdict"] == "fail" for c in rows)
@@ -77,7 +79,7 @@ def _answer(
         json.dumps({"schema_version": 1, "verdict": report_verdict or verdict, "checks": rows}),
         encoding="utf-8",
     )
-    response = {
+    response: dict[str, Any] = {
         "schema_version": 2,
         "request_id": out["request_id"],
         "request_sha256": _sha(request_path),
