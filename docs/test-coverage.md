@@ -99,3 +99,26 @@ find what they missed.
 - **Mutation testing**: a mutant (a flipped comparison, a removed condition)
   that survives the suite marks an assertion that is missing even though the
   line is covered. Mutation runs are advisory evidence, not a CI gate.
+
+## Reference suite
+
+`tests/test_gate_boundaries.py` applies these techniques to the rule tables
+behind the gates, following the family pattern set by wire-agent:
+
+- 3-value boundaries for every numeric DFM and mechanism limit (declared,
+  measured and maximum wall, minimum hole diameter including the sheet-metal
+  thickness rule, hole and opening edge distance, bend radius, hole to bend
+  line, snap-fit strain and aspect ratio, living-hinge web, rib-to-wall ratio,
+  boss diameter ratio and wall, detent ramp, gear undercut and backlash) and
+  for both stack-up window edges, built with `math.nextafter` where the limit
+  is a float;
+- equivalence classes over the ISO 286 nominal bins (lower-open,
+  upper-closed edges, no gaps, nothing at or below zero or above the table)
+  and every hole and shaft class the brief schema accepts;
+- decision tables for the fit classification (`min_clearance > 0`,
+  `max_clearance < 0`, otherwise transition, with H7/h6 on the zero
+  boundary), process x bracket form for the bend rules, process x countersink
+  for fdm, and material x web thickness for living hinges;
+- fail-closed cases: unsupported tolerance classes and nominal sizes are
+  `unknown`, unmeasured walls are `unknown`, and features without their
+  defining parameters fail.

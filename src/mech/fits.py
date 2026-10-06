@@ -106,12 +106,9 @@ def _bin_index(nominal_mm: float) -> int | None:
 def hole_limits(hole_class: str, nominal_mm: float) -> LimitsMm | None:
     """Hole-basis limits: lower deviation 0, upper +IT."""
     index = _bin_index(nominal_mm)
-    if index is None or len(hole_class) != 2 or hole_class[0] != "H":
+    if index is None or hole_class not in HOLE_CLASSES:
         return None
-    try:
-        grade = int(hole_class[1])
-    except ValueError:
-        return None
+    grade = int(hole_class[1:])
     table = IT_GRADES.get(grade)
     if table is None:
         return None

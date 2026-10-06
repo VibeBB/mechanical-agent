@@ -76,13 +76,14 @@ branch = true
 # Ratchet floors (percent) for scripts/structural_coverage.py, measured on
 # main minus one point for interpreter variance. Raise them, never lower.
 # Measured as CI's verify job runs: no rsvg-convert on PATH, so the render
-# tests skip. c0 = 83 keeps main's former statement-only fail_under.
-c0 = 83
-c1 = 68
-decision = 60
-c2 = 58
-mcdc = 33
-boundary = 29
+# tests skip. c0 stays at or above main's former statement-only fail_under
+# of 83.
+c0 = 85
+c1 = 73
+decision = 65
+c2 = 64
+mcdc = 38
+boundary = 46
 
 [tool.coverage.report]
-fail_under = 79
+fail_under = 83
