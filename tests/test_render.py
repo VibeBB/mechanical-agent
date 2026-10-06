@@ -620,3 +620,115 @@ def test_render_author_outputs(tmp_path: Path, enclosure_brief: DesignBrief) -> 
     for r in renders:
         assert Path(r["png_path"]).is_file()
         assert len(r["image_sha256"]) == 64
+
+
+def _shell_step(tmp_path: Path) -> Path:
+    from build123d import Box, Pos
+    from build123d.exporters3d import export_step
+
+    path = tmp_path / "shell.step"
+    export_step(Box(40, 30, 20) - Pos(0, 0, 1.5) * Box(36, 26, 20), str(path))
+    return path
+
+
+@pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
+@pytest.mark.parametrize(
+    ("axis", "offset", "area"),
+    [
+        # open-top 40x30x20 shell: 2 mm walls, 1.5 mm floor, cavity 18.5 mm deep
+        ("x", 0.0, 30 * 20 - 26 * 18.5),
+        ("y", 0.0, 40 * 20 - 36 * 18.5),
+        ("z", -2.0, 40 * 30 - 36 * 26),
+    ],
+)
+def test_render_section_hatches_cut_walls(
+    tmp_path: Path, axis: str, offset: float, area: float
+) -> None:
+    from mech.views import render_section
+
+    result = render_section(_shell_step(tmp_path), axis=axis, offset_mm=offset)
+    assert Path(result.png_path).name == f"shell.section-{axis}.png"
+    assert Path(result.png_path).read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    assert result.section_area_mm2 == pytest.approx(area)
+    assert result.region_count == 1
+    assert result.plane_mm == pytest.approx(offset)
+    svg = Path(result.svg_path).read_text(encoding="utf-8")
+    assert 'fill="url(#section-hatch)"' in svg
+    assert 'fill-rule="evenodd"' in svg
+    assert f"SECTION {axis.upper()}-{axis.upper()}" in svg
+
+
+@pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
+def test_render_section_keeps_the_far_half(tmp_path: Path) -> None:
+    from build123d import Box, Compound, Pos
+    from build123d.exporters3d import export_step
+
+    from mech.views import render_section
+
+    # two separate blocks: only the +y block lies behind a y-section seen from front
+    step = tmp_path / "pair.step"
+    export_step(Compound([Pos(0, -10, 0) * Box(4, 4, 4), Pos(0, 10, 0) * Box(8, 4, 4)]), str(step))
+    result = render_section(step, axis="y", offset_mm=10.0)
+    assert result.section_area_mm2 == pytest.approx(8 * 4)
+
+
+@pytest.mark.parametrize(
+    ("axis", "offset", "message"),
+    [
+        ("w", 0.0, "axis"),
+        ("x", 20.0, "outside the part"),
+        ("x", -25.0, "outside the part"),
+        ("x", float("nan"), "finite"),
+    ],
+)
+def test_render_section_fail_closed(tmp_path: Path, axis: str, offset: float, message: str) -> None:
+    from mech.views import render_section
+
+    with pytest.raises(RenderError, match=message):
+        render_section(_step(tmp_path), axis=axis, offset_mm=offset)
+
+
+def test_render_section_misses_material_fails_closed(tmp_path: Path) -> None:
+    from build123d import Box, Compound, Pos
+    from build123d.exporters3d import export_step
+
+    from mech.views import render_section
+
+    step = tmp_path / "gap.step"
+    export_step(Compound([Pos(-10, 0, 0) * Box(4, 4, 4), Pos(10, 0, 0) * Box(4, 4, 4)]), str(step))
+    with pytest.raises(RenderError, match="cuts no material"):
+        render_section(step, axis="x", offset_mm=0.0)
+
+
+def test_render_section_missing_source_fails_closed(tmp_path: Path) -> None:
+    from mech.views import render_section
+
+    with pytest.raises(RenderError, match="missing"):
+        render_section(tmp_path / "nope.step", axis="x")
+    bad = tmp_path / "part.dxf"
+    bad.write_text("x", encoding="utf-8")
+    with pytest.raises(RenderError, match=r"not a \.step"):
+        render_section(bad, axis="x")
+
+
+@pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
+def test_cli_and_mcp_render_section(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from mech.cli import main
+    from mech.mcp_server import call_tool
+
+    step = _shell_step(tmp_path)
+    assert main(["render-section", "--step", str(step), "--axis", "z", "--offset", "-2"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["section_area_mm2"] == pytest.approx(264.0)
+    monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
+    result = call_tool("mech_render_section", {"step": "shell.step", "axis": "y"})
+    assert not result.isError
+    data = json.loads(result.content[0].text)  # type: ignore[union-attr]
+    assert data["axis"] == "y"
+    assert any(getattr(item, "type", "") == "image" for item in result.content)
+    assert call_tool("mech_render_section", {"step": "shell.step", "axis": "q"}).isError
+    assert call_tool(
+        "mech_render_section", {"step": "shell.step", "axis": "x", "offset_mm": "1"}
+    ).isError

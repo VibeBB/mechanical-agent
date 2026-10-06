@@ -33,6 +33,7 @@ tools; all are `idempotentHint: true`, `openWorldHint: false`.
 | `mech_appearance` | W | `brief`, `out_dir` | same payload as `appearance` | missing `appearance`, path outside the workspace |
 | `mech_render` | W | `dxf_path`, `out_path?`, `dpi?`, `baseline_path?` | `.svg` + `.png` + `image_sha256` (+ baseline match/diff/recorded); PNG returned inline as ImageContent | missing/invalid DXF, missing rsvg-convert, corrupt baseline |
 | `mech_render_views` | W | `step`, `envelope?`, `baseline_path?` | `<step>.views.svg` + `.views.png` third-angle 2x2 sheet ([top, iso] over [front, right], hidden edges dashed, anchor overlay when `envelope` given); PNG returned inline | missing/invalid STEP, missing rsvg-convert, envelope without `anchor_frame`/`step_frame_offset_mm` sidecar, corrupt baseline |
+| `mech_render_section` | W | `step`, `axis`, `offset_mm?`, `baseline_path?` | `<step>.section-<axis>.svg` + `.png` hatched section, PNG inline, cut area | plane outside the part or cutting no material, bad axis/offset |
 
 ## Records — VRP (write, except status)
 

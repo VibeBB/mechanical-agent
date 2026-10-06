@@ -131,7 +131,7 @@ geometry yet).
 - `dxf_lint.py` — advisory readability lint (`lint_file`).
 - `render.py` — `render_dxf` DXF→SVG→PNG + shared `rasterize_svg`,
   `sha256_file`, `record_or_compare_baseline`.
-- `views.py` — `render_views` STEP→2x2 third-angle views sheet
+- `views.py` — `render_views` STEP→2x2 third-angle views sheet; `render_section` hatched cross-section
   (`ViewsResult`, optional anchor overlay via the envelope sidecar),
   `render_author_outputs` (author-time DXF + views renders).
 - `advisory.py` — advisory envelope + typed visual-review records

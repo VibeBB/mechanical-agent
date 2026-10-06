@@ -103,7 +103,10 @@ and get a
 unreviewed render is unfinished work: the stop hook lists any image
 missing its record. Render every exported `.step` with `mech_render_views` and every
 `.dxf` with `mech_render` first — each views sheet and each drawing
-must be looked at, not merely produced. Record each observation as a `vision_review`
+must be looked at, not merely produced. For enclosures, also cut the
+assembly with `mech_render_section` (at least one wall-normal axis, plus any
+boss, rib or snap the brief declares) to check wall thickness and internal
+features, and review those sheets the same way. Record each observation as a `vision_review`
 advisory record. Do
 not hand-assemble the JSON — run the `review-record` CLI so the record is
 bound to the image bytes and validated against `src/mech/advisory.py`:

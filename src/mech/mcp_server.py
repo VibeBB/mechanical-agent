@@ -171,6 +171,17 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["dxf_path"],
         "additionalProperties": False,
     },
+    "mech_render_section": {
+        "type": "object",
+        "properties": {
+            "step": {"type": "string"},
+            "axis": {"type": "string", "enum": ["x", "y", "z"]},
+            "offset_mm": {"type": "number"},
+            "baseline_path": {"type": "string"},
+        },
+        "required": ["step", "axis"],
+        "additionalProperties": False,
+    },
     "mech_render_views": {
         "type": "object",
         "properties": {
@@ -258,6 +269,11 @@ _DESCRIPTIONS = {
     "mech_render": (
         "Rasterize an exported DXF to PNG for the advisory vision lane; "
         "optional sha256 visual baseline compare."
+    ),
+    "mech_render_section": (
+        "Cut a STEP file with a plane normal to x, y or z (through the bbox centre "
+        "plus offset_mm), draw the hatched section view and return the PNG inline "
+        "with the cut area; fails when the plane misses the part."
     ),
     "mech_render_views": (
         "Project a STEP file into a 2x2 views sheet (front/top/right/isometric, "
@@ -573,6 +589,33 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             if image is not None:
                 content.append(image)
             return types.CallToolResult(content=content)
+        if name == "mech_render_section":
+            from .cli import section_payload
+            from .views import render_section
+
+            step_path = _path_arg(arguments, "step")
+            baseline_path = _optional_path_arg(arguments, "baseline_path")
+            if baseline_path is not None:
+                reject_symlinks(baseline_path)
+            offset = arguments.get("offset_mm", 0.0)
+            if isinstance(offset, bool) or not isinstance(offset, int | float):
+                return _error("offset_mm must be a number")
+            section = render_section(
+                step_path,
+                axis=str(arguments.get("axis", "")),
+                offset_mm=float(offset),
+                baseline_path=baseline_path,
+            )
+            content = [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(section_payload(section), ensure_ascii=False, sort_keys=True),
+                )
+            ]
+            image = _image_content(Path(section.png_path))
+            if image is not None:
+                content.append(image)
+            return types.CallToolResult(content=content)
         if name == "mech_render_views":
             from .views import render_views
 
@@ -636,6 +679,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_dxf_lint": _anno("DXF lint", write=False),
     "mech_render": _anno("Render DXF to PNG", write=True),
     "mech_render_views": _anno("Render STEP views sheet", write=True),
+    "mech_render_section": _anno("Render STEP section view", write=True),
     "mech_record_decision": _anno("Record decision", write=True),
     "mech_record_impression": _anno("Record stage impression", write=True),
     "mech_record_vision_review": _anno("Record vision review", write=True),

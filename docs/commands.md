@@ -31,6 +31,7 @@ exits 0, anything else exits 1 (fail-closed — exceptions become
 | `dxf-lint` | `--in <dxf> [--out]` | advisory readability lint |
 | `render` | `--dxf [--out] [--dpi] [--baseline]` | DXF→SVG→PNG + optional sha256 baseline |
 | `render-views` | `--step [--baseline]` | STEP→`.views.svg`/`.views.png` 2x2 sheet |
+| `render-section` | `--step --axis x\|y\|z [--offset] [--baseline]` | STEP→`.section-<axis>.svg`/`.png`: plane through the bbox centre + offset, far half projected, cut faces hatched; payload carries `plane_mm`, `section_area_mm2`, `region_count`; error when the plane misses the part |
 | `board-import` | `--geometry <circuit *.board-geometry.json> [--source-path]` | prints the enclosure `board` block (size, thickness, keepout = tallest top part, `MH<n>` holes, `source` hash pin) plus `connector_openings` targets; `fail` on an incomplete geometry |
 | `sim-request` | `--brief <brief.json> --out-dir <dir> [--workspace <root>]` | writes `<name>.ruggedness.sim.json` (simulation `ruggedness` section) and `<name>.ruggedness.sim-request.json` (v1, `kind: ruggedness`); `fail` without `enclosure.ruggedness` or, for vibration, without `enclosure.board` |
 | `appearance` | `--brief <brief.json> --out-dir <dir>` | writes `<name>.mech-appearance.json` (cosmetic class per face, defect limits, viewing condition, accept/reject limit samples) for production-engineering; `fail` without `appearance` |

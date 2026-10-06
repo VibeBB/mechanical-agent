@@ -92,6 +92,11 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
   [front, right]); `envelope_path` overlays harness anchors and requires
   the provenance sidecar (`anchor_frame` + `step_frame_offset_mm`),
   else `RenderError`.
+- `render_section(step_path, *, axis, offset_mm=0.0, baseline_path=None,
+  dpi=200)` → `SectionResult` (`plane_mm`, `section_area_mm2`,
+  `region_count`) — splits at the bbox centre + offset, projects the half
+  behind the plane (front/right/top viewer for y/x/z), hatches cut faces;
+  `RenderError` when the plane is outside the part or cuts no material.
 - `render_author_outputs(name, part_ids, out_dir, *, dpi=200)` → list of
   `{kind, source, png_path, image_sha256}` — renders every DXF + a views
   sheet per STEP; raises `RenderError` on the first failure.
