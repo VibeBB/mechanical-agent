@@ -466,3 +466,186 @@ def render_author_outputs(
             }
         )
     return renders
+
+
+# axis -> (viewport direction, viewport up) of the view that looks at the cut
+# face; the kept half lies behind the plane (away from the viewer).
+_SECTION_VIEWS: dict[str, tuple[tuple[float, float, float], tuple[float, float, float]]] = {
+    "x": ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
+    "y": ((0.0, -1.0, 0.0), (0.0, 0.0, 1.0)),
+    "z": ((0.0, 0.0, 1.0), (0.0, 1.0, 0.0)),
+}
+_AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
+_PLANE_TOL_MM = 1e-6
+_MIN_CUT_DEPTH_MM = 1e-3
+_SECTION_MIN_PAGE_W_MM = 170.0
+
+
+@dataclass(frozen=True)
+class SectionResult:
+    step_path: str
+    svg_path: str
+    png_path: str
+    image_sha256: str
+    axis: str
+    plane_mm: float
+    section_area_mm2: float
+    region_count: int
+    baseline: BaselineVerdict | None = None
+    baseline_sha256: str | None = None
+
+
+def _component(vector: Any, index: int) -> float:
+    return float((vector.X, vector.Y, vector.Z)[index])
+
+
+def _face_loops(
+    face: Any,
+    center: tuple[float, float, float],
+    direction: tuple[float, float, float],
+    up: tuple[float, float, float],
+) -> list[list[tuple[float, float]]]:
+    loops: list[list[tuple[float, float]]] = []
+    for wire in [face.outer_wire(), *face.inner_wires()]:
+        loop: list[tuple[float, float]] = []
+        for edge in wire.order_edges():
+            try:
+                length = float(edge.length)
+            except Exception:
+                length = 1.0
+            count = max(4, min(_SAMPLES, int(length * 2) + 1))
+            for i in range(count):
+                p = edge.position_at(i / count)
+                loop.append(_project_point((p.X, p.Y, p.Z), center, direction, up))
+        if loop:
+            loops.append(loop)
+    return loops
+
+
+def render_section(
+    step_path: Path,
+    *,
+    axis: str,
+    offset_mm: float = 0.0,
+    baseline_path: Path | None = None,
+    dpi: int = 200,
+) -> SectionResult:
+    """Render a hatched cross-section of `step_path` cut normal to `axis`.
+
+    The plane passes through the bounding-box centre shifted by
+    ``offset_mm`` along ``axis``; the half behind the plane (as seen from
+    the matching front/right/top view) is projected and every cut face is
+    hatched. A plane outside the part, or one that cuts no material,
+    raises ``RenderError``.
+    """
+    if axis not in _SECTION_VIEWS:
+        raise RenderError(f"section axis must be one of x, y, z: {axis!r}")
+    if not math.isfinite(offset_mm):
+        raise RenderError("section offset must be finite")
+    if not step_path.is_file() or step_path.stat().st_size == 0:
+        raise RenderError(f"section source is missing or empty: {step_path}")
+    if step_path.suffix.lower() not in (".step", ".stp"):
+        raise RenderError(f"section source is not a .step file: {step_path}")
+    reject_symlinks(step_path)
+    if dpi <= 0:
+        raise RenderError("dpi must be positive")
+    try:
+        from build123d import Keep, Plane, import_step, split
+    except ImportError as exc:
+        raise RenderError(f"build123d unavailable: {exc}") from exc
+    try:
+        compound = import_step(step_path)
+        bounds = compound.bounding_box()
+    except Exception as exc:
+        raise RenderError(f"cannot import STEP {step_path}: {exc}") from exc
+    lo = (bounds.min.X, bounds.min.Y, bounds.min.Z)
+    hi = (bounds.max.X, bounds.max.Y, bounds.max.Z)
+    center = tuple((a + b) / 2 for a, b in zip(lo, hi, strict=True))
+    index = _AXIS_INDEX[axis]
+    plane_at = center[index] + offset_mm
+    if not lo[index] + _MIN_CUT_DEPTH_MM < plane_at < hi[index] - _MIN_CUT_DEPTH_MM:
+        raise RenderError(
+            f"section plane {axis}={plane_at:.3f} mm lies outside the part "
+            f"({lo[index]:.3f}..{hi[index]:.3f} mm)"
+        )
+    direction, up = _SECTION_VIEWS[axis]
+    keep_dir = (-direction[0], -direction[1], -direction[2])
+    origin = list(center)
+    origin[index] = plane_at
+    try:
+        cut = split(
+            compound,
+            bisect_by=Plane(origin=tuple(origin), z_dir=keep_dir),
+            keep=Keep.TOP,
+        )
+        faces = [
+            face
+            for face in cut.faces()
+            if abs(_component(face.center(), index) - plane_at) <= _PLANE_TOL_MM
+            and abs(abs(_component(face.normal_at(), index)) - 1.0) <= 1e-9
+        ]
+    except Exception as exc:
+        raise RenderError(f"section cut failed: {exc}") from exc
+    if not faces:
+        raise RenderError(f"section plane {axis}={plane_at:.3f} mm cuts no material")
+    view_center = cast(tuple[float, float, float], tuple(origin))
+    visible, _hidden = _view_geometry(cut, view_center, direction, up)
+    regions = [_face_loops(face, view_center, direction, up) for face in faces]
+    area = sum(float(face.area) for face in faces)
+
+    all_lines = [*visible, *(loop for region in regions for loop in region)]
+    lo_x, hi_x, lo_y, hi_y = _lines_bbox(all_lines)
+    view_w = hi_x - lo_x
+    view_h = hi_y - lo_y
+    page_w = max(view_w + 2 * _MARGIN_MM, _SECTION_MIN_PAGE_W_MM)
+    page_h = view_h + 2 * _MARGIN_MM + _LABEL_H_MM + _FOOTER_H_MM
+    ox = (page_w - view_w) / 2 - lo_x
+    oy = _MARGIN_MM + _LABEL_H_MM + hi_y
+    solid = 'stroke="#111" stroke-width="0.35"'
+    hatch_style = 'fill="url(#section-hatch)" stroke="#111" stroke-width="0.5"'
+    label = f"SECTION {axis.upper()}-{axis.upper()} ({axis} = {plane_at:.2f} mm)"
+    svg: list[str] = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{page_w:.1f}mm" '
+        f'height="{page_h:.1f}mm" viewBox="0 0 {page_w:.3f} {page_h:.3f}">',
+        '<defs><pattern id="section-hatch" patternUnits="userSpaceOnUse" width="2" '
+        'height="2" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2" '
+        'stroke="#111" stroke-width="0.25"/></pattern></defs>',
+        f'<rect x="0" y="0" width="{page_w:.3f}" height="{page_h:.3f}" fill="#fff"/>',
+        f'<text x="2" y="{_LABEL_H_MM - 1:.3f}" font-size="3.5" '
+        f'font-family="sans-serif">{label}</text>',
+    ]
+    svg.extend(_polylines_svg(visible, (ox, oy), 1.0, solid))
+    for region in regions:
+        path = " ".join(
+            "M " + " L ".join(f"{ox + x:.3f},{oy - y:.3f}" for x, y in loop) + " Z"
+            for loop in region
+        )
+        svg.append(f'<path d="{path}" fill-rule="evenodd" {hatch_style}/>')
+    svg.append(
+        f'<text x="{_MARGIN_MM:.3f}" y="{page_h - 3:.3f}" font-size="3" '
+        f'font-family="sans-serif">section view, scale 1:1, units mm — {step_path.name} — '
+        f"cut area {area:.1f} mm2 in {len(faces)} region(s)</text>"
+    )
+    svg.append("</svg>")
+
+    svg_path = step_path.with_suffix(f".section-{axis}.svg")
+    png_path = step_path.with_suffix(f".section-{axis}.png")
+    svg_path.write_text("\n".join(svg) + "\n", encoding="utf-8")
+    rasterize_svg(svg_path, png_path, dpi)
+    baseline: BaselineVerdict | None = None
+    baseline_sha: str | None = None
+    if baseline_path is not None:
+        baseline, baseline_sha = record_or_compare_baseline(png_path, baseline_path)
+    return SectionResult(
+        step_path=str(step_path),
+        svg_path=str(svg_path),
+        png_path=str(png_path),
+        image_sha256=sha256_file(png_path),
+        axis=axis,
+        plane_mm=plane_at,
+        section_area_mm2=area,
+        region_count=len(faces),
+        baseline=baseline,
+        baseline_sha256=baseline_sha,
+    )

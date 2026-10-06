@@ -8,6 +8,7 @@ Subcommands:
   gates           regenerate the design and re-run all gates on existing artifacts
   render          rasterize an exported DXF to PNG for the advisory vision lane
   render-views    project a STEP file to a 2x2 views sheet (SVG + PNG)
+  render-section  cut a STEP file and draw a hatched section view (SVG + PNG)
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
   review-record   write a validated visual-review advisory JSON for an image
   record          append a VibeBB Record Protocol record (decision, impression,
@@ -277,6 +278,36 @@ def _cmd_record(args: argparse.Namespace) -> dict[str, Any]:
         return {"verdict": "fail", "stage": "record", "detail": str(exc)}
 
 
+def _cmd_render_section(args: argparse.Namespace) -> dict[str, Any]:
+    from .views import render_section
+
+    result = render_section(
+        Path(args.step),
+        axis=args.axis,
+        offset_mm=args.offset,
+        baseline_path=Path(args.baseline) if args.baseline else None,
+    )
+    return section_payload(result)
+
+
+def section_payload(result: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "verdict": "pass",
+        "step_path": result.step_path,
+        "svg_path": result.svg_path,
+        "png_path": result.png_path,
+        "image_sha256": result.image_sha256,
+        "axis": result.axis,
+        "plane_mm": result.plane_mm,
+        "section_area_mm2": result.section_area_mm2,
+        "region_count": result.region_count,
+    }
+    if result.baseline is not None:
+        payload["baseline"] = result.baseline
+        payload["baseline_sha256"] = result.baseline_sha256
+    return payload
+
+
 def _cmd_render_views(args: argparse.Namespace) -> dict[str, Any]:
     from .views import render_views
 
@@ -414,6 +445,24 @@ def build_parser() -> argparse.ArgumentParser:
         "(requires its provenance sidecar with step_frame_offset_mm)",
     )
 
+    section_p = sub.add_parser(
+        "render-section",
+        help="cut a STEP file normal to an axis and draw a hatched section (SVG + PNG)",
+    )
+    section_p.add_argument("--step", required=True, help="STEP file to cut")
+    section_p.add_argument("--axis", required=True, choices=("x", "y", "z"))
+    section_p.add_argument(
+        "--offset",
+        type=float,
+        default=0.0,
+        help="plane offset from the bounding-box centre along --axis, mm (default 0)",
+    )
+    section_p.add_argument(
+        "--baseline",
+        default=None,
+        help="optional baseline JSON: recorded when missing, compared when present",
+    )
+
     review_p = sub.add_parser(
         "review-record",
         help="write a validated review-visual-<slug>.advisory.json for an image",
@@ -470,6 +519,7 @@ def main(argv: list[str] | None = None) -> int:
         "dxf-lint": _cmd_dxf_lint,
         "render": _cmd_render,
         "render-views": _cmd_render_views,
+        "render-section": _cmd_render_section,
         "review-record": _cmd_review_record,
         "record": _cmd_record,
         "ux": _cmd_ux,
