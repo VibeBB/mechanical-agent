@@ -574,7 +574,7 @@ def render_section(
     origin[index] = plane_at
     try:
         cut = split(
-            compound,
+            cast(Any, compound),
             bisect_by=Plane(origin=tuple(origin), z_dir=keep_dir),
             keep=Keep.TOP,
         )
