@@ -32,6 +32,7 @@ exits 0, anything else exits 1 (fail-closed — exceptions become
 | `render` | `--dxf [--out] [--dpi] [--baseline]` | DXF→SVG→PNG + optional sha256 baseline |
 | `render-views` | `--step [--baseline]` | STEP→`.views.svg`/`.views.png` 2x2 sheet |
 | `board-import` | `--geometry <circuit *.board-geometry.json> [--source-path]` | prints the enclosure `board` block (size, thickness, keepout = tallest top part, `MH<n>` holes, `source` hash pin) plus `connector_openings` targets; `fail` on an incomplete geometry |
+| `sim-request` | `--brief <brief.json> --out-dir <dir> [--workspace <root>]` | writes `<name>.ruggedness.sim.json` (simulation `ruggedness` section) and `<name>.ruggedness.sim-request.json` (v1, `kind: ruggedness`); `fail` without `enclosure.ruggedness` or, for vibration, without `enclosure.board` |
 | `export-envelope` | `--brief --out [--design-report] [--decision-ref]*` | writes `*.envelope.json` + `*.envelope.provenance.json`; returns `envelope_sha256` |
 | `review-record` | `--image --model --checklist dxf_outline|part_render|assembly_render|intake_image --findings <json> [--impression|--impression-file] [--summary] [--out]` | writes `review-visual-<slug>.advisory.json` and mirrors it into `vision-reviews.jsonl` (`vision_log` in output) |
 | `record` | `decision|impression|vision-review|status --json <file>` | appends a VRP record (`--json` required except for `status`, which prints counts + last stop verdict) |
