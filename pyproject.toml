@@ -43,6 +43,10 @@ line-length = 100
 target-version = "py312"
 src = ["src", "scripts", "tests"]
 
+[tool.ruff.format]
+# Family-canonical files are byte-identical across repos (formatted at 88).
+exclude = ["scripts/structural_coverage.py", "tests/test_structural_coverage.py"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
@@ -66,7 +70,17 @@ markers = ["slow: tests that build full CAD geometry"]
 
 [tool.coverage.run]
 source = ["src/mech"]
-branch = false
+branch = true
+
+[tool.vibebb-coverage]
+# Ratchet floors (percent) for scripts/structural_coverage.py, measured on
+# main minus one point for interpreter variance. Raise them, never lower.
+c0 = 86
+c1 = 72
+decision = 62
+c2 = 60
+mcdc = 34
+boundary = 29
 
 [tool.coverage.report]
 fail_under = 83
