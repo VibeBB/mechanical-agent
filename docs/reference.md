@@ -105,6 +105,13 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
   raises `ValueError` on an incomplete geometry.
 - `along_span(component)` → face-local courtyard span less 0.25 mm.
 
+## appearance.py
+
+- `appearance_payload(brief)` → `mech_appearance` v1 payload; raises
+  `ValueError` without `appearance`.
+- `write_appearance(brief, out_dir)` → writes `<name>.mech-appearance.json`;
+  returns `path`, `sha256`, `surfaces`, `samples`.
+
 ## sim_request.py
 
 - `opening_min_dims(enclosure)` → IP probe size of every opening and vent slot.

@@ -510,6 +510,152 @@ class HarnessAnchor(BaseModel):
     )
 
 
+DefectKind = Literal[
+    "scratch",
+    "dent",
+    "contamination",
+    "color_deviation",
+    "gloss_deviation",
+    "sink_mark",
+    "flow_line",
+    "weld_line",
+    "gate_vestige",
+    "ejector_mark",
+    "flash",
+    "parting_line_step",
+    "layer_line",
+    "burr",
+]
+
+# Defects a process cannot produce are rejected, so no limit sample is ever
+# cut for an impossible defect; unlisted defects apply to every process.
+PROCESS_DEFECTS: dict[str, frozenset[str]] = {
+    "molding": frozenset(
+        {"sink_mark", "flow_line", "weld_line", "gate_vestige", "ejector_mark", "flash"}
+    ),
+    "fdm": frozenset({"layer_line"}),
+    "machining": frozenset({"burr"}),
+    "sheet_metal": frozenset({"burr"}),
+}
+DELTA_DEFECTS = frozenset({"color_deviation", "gloss_deviation"})
+
+DESIGN_FACES: dict[str, tuple[str, ...]] = {
+    "enclosure": ("front", "back", "left", "right", "top", "bottom"),
+    "bracket": ("base", "leg", "plate"),
+    "spur_gear": ("face", "hub", "bore", "teeth"),
+}
+
+
+class ViewingCondition(BaseModel):
+    """How an inspector looks at a surface when judging it against a limit sample."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    distance_mm: float = Field(gt=0)
+    illuminance_lux: float = Field(gt=0)
+    time_s: float = Field(gt=0)
+    angle_deg: float = Field(ge=0, le=90)
+    source: str = Field(min_length=1)
+
+
+class DefectLimit(BaseModel):
+    """Largest acceptable instance of one defect on a cosmetic surface.
+
+    ``max_delta`` is a color difference (Delta E) or a gloss difference (GU)
+    for ``color_deviation`` / ``gloss_deviation``; every other defect is
+    bounded by ``max_size_mm``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    defect: DefectKind
+    max_size_mm: float | None = Field(default=None, ge=0)
+    max_count: int = Field(ge=0)
+    max_delta: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_bound(self) -> DefectLimit:
+        if self.defect in DELTA_DEFECTS:
+            if self.max_delta is None or self.max_size_mm is not None:
+                raise ValueError(f"{self.defect} is bounded by max_delta only")
+        elif self.max_size_mm is None or self.max_delta is not None:
+            raise ValueError(f"{self.defect} is bounded by max_size_mm only")
+        return self
+
+
+class AppearanceSurface(BaseModel):
+    """Cosmetic class of one face: A = primary view, B = secondary, C = hidden."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    face: str = Field(min_length=1)
+    cosmetic_class: Literal["A", "B", "C"]
+    defects: list[DefectLimit] = Field(default_factory=list[DefectLimit])
+
+    @model_validator(mode="after")
+    def validate_defects(self) -> AppearanceSurface:
+        kinds = [limit.defect for limit in self.defects]
+        if len(set(kinds)) != len(kinds):
+            raise ValueError(f"appearance face {self.face} lists a defect twice")
+        if self.cosmetic_class != "C" and not self.defects:
+            raise ValueError(f"class {self.cosmetic_class} face {self.face} needs defect limits")
+        return self
+
+
+class LimitSample(BaseModel):
+    """One physical boundary sample: the worst accepted or the mildest rejected part."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^LS[0-9]+$")
+    face: str = Field(min_length=1)
+    defect: DefectKind
+    side: Literal["accept", "reject"]
+    description: str = Field(min_length=1)
+
+
+class AppearanceSpec(BaseModel):
+    """Cosmetic acceptance criteria and the limit samples production judges against."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    viewing: ViewingCondition
+    surfaces: list[AppearanceSurface] = Field(min_length=1)
+    samples: list[LimitSample] = Field(default_factory=list[LimitSample])
+
+    @model_validator(mode="after")
+    def validate_samples(self) -> AppearanceSpec:
+        faces = [surface.face for surface in self.surfaces]
+        if len(set(faces)) != len(faces):
+            raise ValueError("appearance faces must be unique")
+        ids = [sample.id for sample in self.samples]
+        if len(set(ids)) != len(ids):
+            raise ValueError("limit sample ids must be unique")
+        declared = {
+            (surface.face, limit.defect): surface.cosmetic_class
+            for surface in self.surfaces
+            for limit in surface.defects
+        }
+        sides: dict[tuple[str, str], list[str]] = {}
+        for sample in self.samples:
+            key = (sample.face, sample.defect)
+            if key not in declared:
+                raise ValueError(
+                    f"limit sample {sample.id} has no {sample.defect} limit on face {sample.face}"
+                )
+            sides.setdefault(key, []).append(sample.side)
+        for key, cosmetic_class in sorted(declared.items()):
+            found = sorted(sides.get(key, []))
+            if cosmetic_class == "C" and not found:
+                continue
+            if found != ["accept", "reject"]:
+                raise ValueError(
+                    f"{key[1]} on class {cosmetic_class} face {key[0]} needs exactly one "
+                    f"accept and one reject limit sample (has {found or 'none'})"
+                )
+        return self
+
+
 class DesignBrief(BaseModel):
     """Top-level design contract consumed by the generators and gates."""
 
@@ -530,6 +676,7 @@ class DesignBrief(BaseModel):
     stackups: list[StackupChain] = Field(default_factory=list[StackupChain])
     harness_anchors: list[HarnessAnchor] = Field(default_factory=list[HarnessAnchor])
     drawing: DrawingInfo = Field(default_factory=DrawingInfo)
+    appearance: AppearanceSpec | None = None
 
     @model_validator(mode="after")
     def validate_design(self) -> DesignBrief:
@@ -559,7 +706,29 @@ class DesignBrief(BaseModel):
         anchor_names = [anchor.name for anchor in self.harness_anchors]
         if len(set(anchor_names)) != len(anchor_names):
             raise ValueError("harness anchor names must be unique")
+        if self.appearance is not None:
+            self._validate_appearance(self.appearance)
         return self
+
+    def _validate_appearance(self, appearance: AppearanceSpec) -> None:
+        faces = DESIGN_FACES[self.design_type]
+        foreign = {
+            defect
+            for process, defects in PROCESS_DEFECTS.items()
+            if process != self.process
+            for defect in defects
+        } - PROCESS_DEFECTS.get(self.process, frozenset())
+        for surface in appearance.surfaces:
+            if surface.face not in faces:
+                raise ValueError(
+                    f"appearance face {surface.face!r} is not a {self.design_type} face "
+                    f"({', '.join(faces)})"
+                )
+            for limit in surface.defects:
+                if limit.defect in foreign:
+                    raise ValueError(
+                        f"{limit.defect} on face {surface.face} cannot occur in {self.process}"
+                    )
 
     def part_ids(self) -> list[str]:
         """Deterministic ids of the generated parts."""

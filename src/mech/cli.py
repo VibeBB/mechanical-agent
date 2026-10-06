@@ -10,6 +10,7 @@ Subcommands:
   render-views    project a STEP file to a 2x2 views sheet (SVG + PNG)
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
   sim-request     emit a simulation-agent ruggedness brief + request (drop/vibration/IP)
+  appearance      emit cosmetic criteria + limit samples (*.mech-appearance.json)
   review-record   write a validated visual-review advisory JSON for an image
   record          append a VibeBB Record Protocol record (decision, impression,
                   vision-review) or print the records status
@@ -59,6 +60,15 @@ def _cmd_sim_request(args: argparse.Namespace) -> dict[str, Any]:
         return write_sim_request(brief, Path(args.out_dir), root=root)
     except Exception as exc:
         return {"verdict": "fail", "stage": "sim-request", "detail": str(exc)}
+
+
+def _cmd_appearance(args: argparse.Namespace) -> dict[str, Any]:
+    from .appearance import write_appearance
+
+    try:
+        return write_appearance(load_brief(Path(args.brief)), Path(args.out_dir))
+    except Exception as exc:
+        return {"verdict": "fail", "stage": "appearance", "detail": str(exc)}
 
 
 def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
@@ -403,6 +413,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="workspace root the request's brief_path is made relative to",
     )
 
+    appearance_p = sub.add_parser(
+        "appearance",
+        help="emit cosmetic criteria and limit samples for production-engineering",
+    )
+    appearance_p.add_argument("--brief", required=True)
+    appearance_p.add_argument("--out-dir", required=True)
+
     envelope_p = sub.add_parser(
         "export-envelope",
         help="emit the wire-agent envelope contract",
@@ -487,6 +504,7 @@ def main(argv: list[str] | None = None) -> int:
         "doctor": _cmd_doctor,
         "export-envelope": _cmd_export_envelope,
         "sim-request": _cmd_sim_request,
+        "appearance": _cmd_appearance,
         "intake": _cmd_intake,
         "author": _cmd_author,
         "export": _cmd_export,

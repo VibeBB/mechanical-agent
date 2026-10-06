@@ -87,6 +87,19 @@ opening sizes) and a `kind: ruggedness` `*.sim-request.json`. simulation's
 `sim-liaison` answers with a `*.sim-response.json`; its gates own the
 verdict (dust and water IP digits stay `unknown` until a physical test).
 
+## Appearance limit samples → production-engineering
+
+`appearance` / `mech_appearance` projects the brief's `appearance` block into
+`<name>.mech-appearance.json` (`artifact_kind: mech_appearance`, the brief
+sha256, material, process, viewing condition, faces with cosmetic class and
+defect limits, limit samples). Every defect limit on a class A or B face has
+exactly one `accept` sample (the worst part still shipped) and one `reject`
+sample (the mildest part refused), so the inspector judges on the boundary.
+production-engineering imports it as `mech-appearance`, lists the sample ids
+in a visual inspection's `limit_samples`, and its `appearance.limit_samples`
+gate fails until every pair is held by a visual attribute inspection. mech
+does not make the physical samples; it owns their criteria.
+
 ## Envelope → wire
 
 `export-envelope` / `mech_export_envelope` emits `<name>.envelope.json`

@@ -54,6 +54,10 @@ def test_protect_denies_artifact_writes() -> None:
         },
         {
             "tool_name": "file_editor",
+            "tool_input": {"command": "create", "path": "out/demo.mech-appearance.json"},
+        },
+        {
+            "tool_name": "file_editor",
             "tool_input": {"command": "insert", "path": "out/part.3mf"},
         },
         {
