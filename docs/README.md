@@ -38,3 +38,4 @@
 - [adr/ADR-0005-vision-render-and-review-records.md](adr/ADR-0005-vision-render-and-review-records.md) — DXF→PNG render, visual baseline, typed visual-review records
 - [adr/ADR-0006-attest-published-tools-images.md](adr/ADR-0006-attest-published-tools-images.md) — attest published tools images and verify provenance for locked tools
 - [adr/ADR-0007-vibebb-records-vision-liaison.md](adr/ADR-0007-vibebb-records-vision-liaison.md) — VRP v1 port, STEP views vision point, SLP v2 liaison, envelope provenance sidecar
+- [adr/ADR-0008-iso7200-title-block.md](adr/ADR-0008-iso7200-title-block.md) — ISO 7200 DXF title block sourced from `brief.drawing`, derived document status, brief digest

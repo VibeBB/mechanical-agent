@@ -162,6 +162,8 @@ def export_design(
             process=brief.process,
             fits=brief.fits,
             enclosure=brief.enclosure,
+            drawing=brief.drawing,
+            source_sha256=brief_sha256(brief),
         )
         record(dxf_path, "dxf", part.part_id)
         lint_report = dxf_lint.lint_text(

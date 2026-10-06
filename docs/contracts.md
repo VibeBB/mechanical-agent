@@ -23,6 +23,17 @@ status, measured, limit, detail}` shape) passes when every coordinate
 lies within [-1, size+1] mm of the assembly bbox in that frame; anchors
 without `position_mm` produce no check.
 
+`drawing` (`DrawingInfo`, all optional) carries the ISO 7200 title-block
+data a brief cannot derive: `legal_owner`, `identification_prefix`
+(drawing number is `<prefix or name>-<part_id>`), `revision` (default
+`A`), `responsible_dept`, `technical_reference`, `created_by`,
+`approved_by`, `date_of_issue` (ISO date; requires `approved_by`),
+`supplementary_title`, `classification`, `language` (default `en`). The
+document status is derived, never declared: `Released` (approver and issue
+date), `In approval` (approver only), otherwise `In preparation`. Unset
+fields print `—` on the sheet. Producer branding is never drawn; the
+`GENERATOR` row names the tool (ADR-0008).
+
 ### `*.intake.json` — `src/mech/intake.py::Intake`
 
 `requirements[]` (R* ids), `assumptions[]` (A*), `open_questions[]` (Q*),

@@ -95,8 +95,8 @@ def test_annotated_dxf_carries_notes_hole_table_and_fits(
         if e.dxftype() == "TEXT":
             texts.setdefault(e.dxf.layer, []).append(e.dxf.text)
     title = " ".join(texts.get("TITLE", []))
-    assert "MATERIAL ABS" in title
-    assert "PROCESS  fdm" in title
+    assert "MATERIAL    ABS" in title
+    assert "PROCESS     fdm" in title
     notes = " ".join(texts.get("NOTES", []))
     assert "HOLE TABLE" in notes
     assert "GEN TOL" in notes
@@ -226,7 +226,7 @@ def test_contract_tables_land_on_the_part_that_owns_them(tmp_path: Path):
     assert "MH1" in shell_notes
     assert "BOARD MOUNT" not in lid_notes
     # Title blocks carry the revision row.
-    assert "REV     A" in " ".join(shell.get("TITLE", []))
+    assert "REV A" in " ".join(shell.get("TITLE", []))
 
 
 def test_design_report_embeds_lint_advisory(enclosure_brief: DesignBrief, tmp_path: Path):

@@ -32,7 +32,8 @@ the exact brief bytes with `brief_sha256`.
   "mechanism_features": [],
   "fits": [],
   "stackups": [],
-  "harness_anchors": []
+  "harness_anchors": [],
+  "drawing": { "...DrawingInfo (optional, ISO 7200 title block)" }
 }
 ```
 
@@ -93,3 +94,13 @@ frame. `python3 "$MECH_PLUGIN/scripts/mech_launcher.py" export-envelope
 `mech_export_envelope` MCP tool) projects them into the wire-agent
 EnvelopeSource contract (ADR-0003); declare an anchor for every seat the
 harness should clip/grommet/breakout through.
+
+## drawing (title block)
+
+Fill `drawing` only with facts the user stated: `legal_owner` (the user's
+organisation, never VibeBB), `identification_prefix`, `revision`,
+`created_by`, `approved_by`, `date_of_issue`, `responsible_dept`,
+`technical_reference`, `classification`, `supplementary_title`,
+`language`. Never invent an approver or an issue date — `date_of_issue`
+without `approved_by` is rejected, and the sheet status (`In preparation`
+/ `In approval` / `Released`) is derived from those two fields.
