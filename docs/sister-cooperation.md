@@ -70,6 +70,15 @@ Refusals (`ValueError` → CLI verdict fail / MCP isError):
 as additional context; `*.ux-response.json` is protected by
 `protect-generated` (written only via `mech_ux_respond`).
 
+## Board geometry ← circuit
+
+circuit's `board-geometry` / `circuit_board_geometry_export` writes
+`*.board-geometry.json`. `board-import` / `mech_board_import` turns it
+into the brief's `enclosure.board` block with a `source` hash pin and lists
+the connector opening targets; the agent authors the openings. The
+`board_geometry` gate then fails on a stale pin or any drift between the
+brief and the board (see `contracts.md`).
+
 ## Envelope → wire
 
 `export-envelope` / `mech_export_envelope` emits `<name>.envelope.json`

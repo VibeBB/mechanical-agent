@@ -89,6 +89,24 @@ def _load_and_generate(brief_path: str) -> tuple[DesignBrief, Any]:
     return brief, design
 
 
+def _geometry_path(brief: DesignBrief, brief_path: str) -> Path | None:
+    from .board_geometry import resolve_source
+
+    return resolve_source(brief, Path(brief_path).parent)
+
+
+def _cmd_board_import(args: argparse.Namespace) -> dict[str, Any]:
+    from .board_geometry import load_geometry, sha256_file, suggest_board
+
+    path = Path(args.geometry)
+    try:
+        geometry = load_geometry(path)
+        suggestion = suggest_board(geometry, args.source_path or str(path), sha256_file(path))
+    except ValueError as exc:
+        return {"verdict": "fail", "stage": "board-import", "detail": str(exc)}
+    return {"verdict": "pass", **suggestion}
+
+
 def _author_renders(
     brief: DesignBrief, design: Any, out_dir: Path
 ) -> list[dict[str, Any]] | dict[str, Any]:
@@ -109,7 +127,9 @@ def _cmd_author(args: argparse.Namespace) -> dict[str, Any]:
     except Exception as exc:
         return {"verdict": "fail", "stage": "generate", "detail": str(exc)}
     export_design(brief, design, out_dir)
-    gate_report = run_gates(brief, design, out_dir)
+    gate_report = run_gates(
+        brief, design, out_dir, board_geometry_path=_geometry_path(brief, args.brief)
+    )
     renders: list[dict[str, Any]] | dict[str, Any] | None = None
     if not args.no_render:
         renders = _author_renders(brief, design, out_dir)
@@ -173,7 +193,9 @@ def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
         brief, design = _load_and_generate(args.brief)
     except Exception as exc:
         return {"verdict": "fail", "stage": "generate", "detail": str(exc)}
-    gate_report = run_gates(brief, design, out_dir)
+    gate_report = run_gates(
+        brief, design, out_dir, board_geometry_path=_geometry_path(brief, args.brief)
+    )
     report_path = write_report(brief, design, gate_report, out_dir)
     result = gate_report.to_dict(brief)
     result["report_path"] = str(report_path)
@@ -320,6 +342,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip the advisory DXF/views renders (default: render them)",
     )
 
+    board_p = sub.add_parser(
+        "board-import",
+        help="derive the enclosure board block from a circuit *.board-geometry.json",
+    )
+    board_p.add_argument("--geometry", required=True)
+    board_p.add_argument(
+        "--source-path", default=None, help="path to pin in the brief (relative to the brief)"
+    )
+
     export_p = sub.add_parser("export", help="generate + export only")
     export_p.add_argument("--brief", required=True)
     export_p.add_argument("--out", required=True)
@@ -435,6 +466,7 @@ def main(argv: list[str] | None = None) -> int:
         "author": _cmd_author,
         "export": _cmd_export,
         "gates": _cmd_gates,
+        "board-import": _cmd_board_import,
         "dxf-lint": _cmd_dxf_lint,
         "render": _cmd_render,
         "render-views": _cmd_render_views,
