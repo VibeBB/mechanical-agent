@@ -280,3 +280,24 @@ def test_non_finite_measurement_is_dropped(
     brief = _brief(enclosure_brief_dict)
     path = _answer(tmp_path, brief, [{**PASSING[0], "measured": True}])
     assert ruggedness_findings(brief, path, tmp_path)[1][2] is None
+
+
+def test_failing_sim_check_carries_margin_and_guidance(
+    tmp_path: Path, enclosure_brief_dict: dict[str, Any]
+) -> None:
+    brief = _brief(enclosure_brief_dict)
+    failing = [
+        PASSING[0],
+        {
+            **PASSING[1],
+            "verdict": "fail",
+            "measured": 1800.0,
+            "margin": -300.0,
+            "guidance": ["pulse_ms ≥ 1.2 (cushioning; peak ∝ 1/pulse)", 7],
+        },
+    ]
+    path = _answer(tmp_path, brief, failing)
+    drop = next(f for f in ruggedness_findings(brief, path, tmp_path) if f[0] == "drop.peak_g")
+    assert drop[1] == "fail"
+    assert "margin -300" in drop[3]
+    assert drop[3].endswith("fix: pulse_ms ≥ 1.2 (cushioning; peak ∝ 1/pulse)")
