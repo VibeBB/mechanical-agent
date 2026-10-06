@@ -148,6 +148,8 @@ geometry yet).
   provenance sidecar).
 - `sim_request.py` — `ruggedness_brief`, `write_sim_request`,
   `opening_min_dims` (simulation-agent ruggedness handoff).
+- `appearance.py` — `appearance_payload`, `write_appearance` (cosmetic
+  criteria and limit samples for production-engineering).
 - `report.py` — `write_report` design-report.json/md.
 - `doctor.py` — `run_doctor` environment probe.
 - `mcp_server.py` — stdio MCP boundary (tool schemas, dispatch,

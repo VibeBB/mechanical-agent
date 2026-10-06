@@ -30,6 +30,7 @@ ARTIFACT_SUFFIXES = (
     ".svg",
     ".png",
     ".ux-response.json",
+    ".mech-appearance.json",
 )
 ARTIFACT_NAMES = (
     "decisions.jsonl",

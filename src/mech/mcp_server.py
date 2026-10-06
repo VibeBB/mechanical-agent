@@ -124,6 +124,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["brief", "out_dir"],
         "additionalProperties": False,
     },
+    "mech_appearance": {
+        "type": "object",
+        "properties": {
+            "brief": {"type": "object"},
+            "out_dir": {"type": "string"},
+        },
+        "required": ["brief", "out_dir"],
+        "additionalProperties": False,
+    },
     "mech_export_envelope": {
         "type": "object",
         "properties": {
@@ -234,6 +243,9 @@ _DESCRIPTIONS = {
     "mech_gates": "Regenerate the design and re-run all gates against out_dir artifacts.",
     "mech_sim_request": (
         "Emit a simulation-agent ruggedness brief and *.sim-request.json (drop, vibration, IP)."
+    ),
+    "mech_appearance": (
+        "Emit cosmetic criteria and limit samples (*.mech-appearance.json) for prodeng."
     ),
     "mech_export_envelope": (
         "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
@@ -488,6 +500,14 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             out_dir = _path_arg(arguments, "out_dir")
             reject_symlinks(out_dir)
             return _ok(write_sim_request(brief, out_dir, root=workspace_root()))
+        if name == "mech_appearance":
+            from .appearance import write_appearance
+            from .brief import DesignBrief
+
+            brief = DesignBrief.model_validate(arguments["brief"])
+            out_dir = _path_arg(arguments, "out_dir")
+            reject_symlinks(out_dir)
+            return _ok(write_appearance(brief, out_dir))
         if name == "mech_export_envelope":
             from .brief import DesignBrief
             from .envelope import write_envelope
@@ -611,6 +631,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_gates": _anno("Re-run gates", write=True),
     "mech_export_envelope": _anno("Export envelope contract", write=True),
     "mech_sim_request": _anno("Emit simulation ruggedness request", write=True),
+    "mech_appearance": _anno("Emit appearance limit samples", write=True),
     "mech_board_import": _anno("Board geometry import", write=False),
     "mech_dxf_lint": _anno("DXF lint", write=False),
     "mech_render": _anno("Render DXF to PNG", write=True),

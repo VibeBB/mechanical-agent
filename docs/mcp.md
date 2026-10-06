@@ -30,6 +30,7 @@ tools; all are `idempotentHint: true`, `openWorldHint: false`.
 | `mech_export_envelope` | W | `brief`, `out_path` | writes `<name>.envelope.json` + `.envelope.provenance.json` (with `anchor_frame`/`step_frame_offset_mm` when the assembly STEP sits beside it); returns anchors + `envelope_sha256` | no harness_anchors, unreadable assembly STEP |
 | `mech_board_import` | R | `geometry_path`, `source_path?` | same payload as `board-import` | missing/malformed geometry, circuit verdict `fail` |
 | `mech_sim_request` | W | `brief`, `out_dir` | same payload as `sim-request`; `brief_path` relative to the workspace | missing `enclosure.ruggedness`, vibration without a board, path outside the workspace |
+| `mech_appearance` | W | `brief`, `out_dir` | same payload as `appearance` | missing `appearance`, path outside the workspace |
 | `mech_render` | W | `dxf_path`, `out_path?`, `dpi?`, `baseline_path?` | `.svg` + `.png` + `image_sha256` (+ baseline match/diff/recorded); PNG returned inline as ImageContent | missing/invalid DXF, missing rsvg-convert, corrupt baseline |
 | `mech_render_views` | W | `step`, `envelope?`, `baseline_path?` | `<step>.views.svg` + `.views.png` third-angle 2x2 sheet ([top, iso] over [front, right], hidden edges dashed, anchor overlay when `envelope` given); PNG returned inline | missing/invalid STEP, missing rsvg-convert, envelope without `anchor_frame`/`step_frame_offset_mm` sidecar, corrupt baseline |
 
