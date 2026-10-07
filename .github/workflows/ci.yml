@@ -57,35 +57,49 @@ jobs:
       - name: Sync dependencies
         id: sync-dependencies
         continue-on-error: ${{ matrix.experimental || false }}
+        # uv sync --locked stays sequential: it builds the venv every leg
+        # below shares, so the first venv build is never concurrent.
         run: uv sync --locked
+      # The five check legs are independent (disjoint output paths) and
+      # run as background steps joined by the wait below. They keep their
+      # top-level id/continue-on-error (not a parallel: group) because the
+      # 3.15 canary report reads steps.<id>.outcome — actionlint cannot see
+      # ids inside parallel groups.
       - name: Ruff
         id: ruff
+        background: true
         continue-on-error: ${{ matrix.experimental || false }}
         run: |
           uv run ruff check .
           uv run ruff format --check .
       - name: Pyright
         id: pyright
+        background: true
         continue-on-error: ${{ matrix.experimental || false }}
         run: uv run pyright
       - name: Pytest
         id: pytest
+        background: true
         continue-on-error: ${{ matrix.experimental || false }}
         # Same command as `verify_all.py --stage fast` so fail_under and the
         # [tool.vibebb-coverage] structural floors gate CI too.
         run: uv run python scripts/structural_coverage.py run --json out/structural-coverage.json
       - name: Docs
         id: docs
+        background: true
         continue-on-error: ${{ matrix.experimental || false }}
         run: uv run python scripts/verify_docs.py
       - name: Shared checks
         id: shared-checks
+        background: true
         continue-on-error: ${{ matrix.experimental || false }}
         run: |
           git diff --check
           uv run python scripts/check_shared_hooks.py
           uv run python scripts/check_shared_workflows.py
 
+      - name: Wait for check legs
+        wait: [ruff, pyright, pytest, docs, shared-checks]
       - name: Report 3.15 canary outcome
         if: matrix.experimental && (steps.setup-uv.outcome == 'failure' || steps.sync-dependencies.outcome == 'failure' || steps.ruff.outcome == 'failure' || steps.pyright.outcome == 'failure' || steps.pytest.outcome == 'failure' || steps.docs.outcome == 'failure' || steps.shared-checks.outcome == 'failure')
         run: |
@@ -93,6 +107,8 @@ jobs:
   dockerfile-lint:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    # No actions/cache usage: forbid restore and save entirely.
+    cache-mode: none
     steps:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
@@ -102,7 +118,11 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+      # Hadolint is read-only on docker/**: overlap it with the BuildKit
+      # setup + --check and join it before the job ends.
       - name: Lint Dockerfiles with hadolint
+        id: hadolint
+        background: true
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: docker/mech-tools.Dockerfile
@@ -110,6 +130,8 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Run BuildKit checks
         run: docker build --check -f docker/mech-tools.Dockerfile .
+      - name: Wait for hadolint
+        wait: hadolint
 
   plugin-load:
     runs-on: ubuntu-26.04

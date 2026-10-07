@@ -19,6 +19,9 @@ jobs:
   sweep:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
+    # Manages the cache store over the REST API only; never uses
+    # actions/cache itself, so forbid restore and save entirely.
+    cache-mode: none
     permissions:
       actions: write # gh cache delete
     steps:
