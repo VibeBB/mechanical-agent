@@ -11,8 +11,8 @@ components the project depends on and how they are used.
 | OpenCASCADE (OCP, via build123d) | LGPL-2.1 w/ exception | Geometry kernel accessed only through build123d's Python API; the OCCT exception clause permits use as a library |
 | [pydantic](https://github.com/pydantic/pydantic) | MIT | Schema validation for brief/intake/report contracts |
 | [mcp](https://github.com/modelcontextprotocol/python-sdk) | MIT | stdio MCP server boundary |
-| [openhands-sdk](https://github.com/OpenHands/software-agent-sdk) 1.52.0 | MIT | Plugin framework (skills, agents, commands, hooks, task sub-agents) |
-| openhands-tools 1.52.0 | MIT | SDK builtin tools used by sub-agents |
+| [openhands-sdk](https://github.com/OpenHands/software-agent-sdk) 1.53.0 | MIT | Plugin framework (skills, agents, commands, hooks, task sub-agents) |
+| openhands-tools 1.53.0 | MIT | SDK builtin tools used by sub-agents |
 | [ezdxf](https://github.com/mozman/ezdxf) (via build123d) | MIT | DXF export backend |
 
 ## Container image components
