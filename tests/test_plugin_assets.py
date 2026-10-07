@@ -225,7 +225,7 @@ def test_ensure_llm_profiles_tolerates_missing_settings(tmp_path: Path):
         check=False,
     )
     assert proc.returncode == 0
-    assert json.loads(proc.stdout)["missing"] == ["vibebb-author", "vibebb-review"]
+    assert json.loads(proc.stdout)["missing"] == ["vibebb-author", "vibebb-review", "oracle"]
 
 
 def test_launcher_resolves(tmp_path: Path):

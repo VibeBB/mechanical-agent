@@ -16,6 +16,7 @@ SKILLS = [
     "mech-enclosure",
     "mech-gates",
     "mech-mechanism",
+    "mech-out-rules",
     "mech-workflow",
 ]
 
@@ -91,7 +92,7 @@ def test_bump(tmp_path: Path, bump: str, expected: str) -> None:
     proc = _run("--bump", bump, "--root", str(root))
     assert proc.returncode == 0
     assert proc.stdout.strip() == expected
-    assert _versions(root) == [expected] * 10
+    assert _versions(root) == [expected] * 11
 
 
 def test_set_version(tmp_path: Path) -> None:
@@ -99,7 +100,7 @@ def test_set_version(tmp_path: Path) -> None:
     proc = _run("--set", "2.5.0", "--root", str(root))
     assert proc.returncode == 0
     assert proc.stdout.strip() == "2.5.0"
-    assert _versions(root) == ["2.5.0"] * 10
+    assert _versions(root) == ["2.5.0"] * 11
 
 
 def test_set_rejects_lower(tmp_path: Path) -> None:
@@ -107,7 +108,7 @@ def test_set_rejects_lower(tmp_path: Path) -> None:
     proc = _run("--set", "0.1.0", "--root", str(root))
     assert proc.returncode == 1
     assert "must be greater than" in proc.stderr
-    assert _versions(root) == ["0.1.0"] * 10
+    assert _versions(root) == ["0.1.0"] * 11
 
 
 def test_inconsistent_rejected(tmp_path: Path) -> None:
@@ -124,7 +125,7 @@ def test_dry_run_leaves_files(tmp_path: Path) -> None:
     proc = _run("--bump", "minor", "--dry-run", "--root", str(root))
     assert proc.returncode == 0
     assert proc.stdout.strip() == "0.2.0"
-    assert _versions(root) == ["0.1.0"] * 10
+    assert _versions(root) == ["0.1.0"] * 11
 
 
 def test_uv_lock_other_versions_untouched(tmp_path: Path) -> None:

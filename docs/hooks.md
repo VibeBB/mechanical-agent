@@ -2,9 +2,13 @@
 
 `plugins/mech/hooks/hooks.json` registers all hook commands; each resolves
 the plugin root via `$MECH_PLUGIN_ROOT` → `$OPENHANDS_PROJECT_DIR/plugins/mech`
-→ `~/.agents/plugins/mech` → `~/.openhands/plugins/installed/mech`. Missing
-scripts exit 0 (never block); `protect-generated` and `mech-doctor` fail
-loud when the plugin root cannot resolve.
+→ `~/.agents/plugins/mech` → `~/.openhands/plugins/installed/mech` →
+`${HOME}/plugins/installed/mech` → `${OH_PERSISTENCE_DIR}/plugins/installed/mech`.
+The two extra candidates resolve the plugin inside an OpenHands docker
+conversation runtime (inner `HOME=/var/openhands/.openhands`), where
+`mech_launcher.py` then fails closed with guidance — docker is unavailable
+there by design. Missing scripts exit 0 (never block); `protect-generated`
+and `mech-doctor` fail loud when the plugin root cannot resolve.
 
 ## session_start
 
@@ -12,7 +16,8 @@ loud when the plugin root cannot resolve.
 |---|---|---|
 | `mech-doctor` | `scripts/mech_launcher.py doctor --warn` | exit 0 always; prints environment probe as context (reads the toolchain, writes nothing) |
 | `intake-attachments` | `hooks/scripts/intake_attachments.py` | exit 0; materializes user-attached intake files to `intake/attachments/<sha256[:12]>.<ext>` + `manifest.jsonl` (reads prompt attachments, writes intake dir) |
-| `ensure-llm-profiles` | `hooks/scripts/ensure_llm_profiles.py` (shared, hash-locked) | exit 0; provisions LLM profiles incl. the vision profile (writes `~/.openhands/llm_profiles`) |
+| `ensure-llm-profiles` | `hooks/scripts/ensure_llm_profiles.py` (shared, hash-locked) | exit 0; provisions the `vibebb-author`/`vibebb-review`/`oracle` LLM profiles incl. the vision profile (writes `~/.openhands/llm_profiles`) |
+| `ensure-agent-profiles` | `hooks/scripts/ensure_agent_profiles.py` (shared, hash-locked) | exit 0; writes `~/.openhands/agent-profiles/vibebb-mech.json` when missing: openhands-kind, `llm_profile_ref=vibebb-author`, MCP scoped to `mech`, no secrets |
 | `require-records` | `hooks/scripts/require_records.py session-start` (shared, hash-locked) | exit 0; writes `observations/mech/.sessions/<session>.json` marker |
 | `report-ux-inbox` | `hooks/scripts/report_ux_inbox.py` | exit 0 always; reads `liaison/*.ux-request.json`, writes nothing; prints pending mech requests as `additionalContext` telling the agent to call `mech_ux_inbox`; silent when none |
 
@@ -42,6 +47,6 @@ loud when the plugin root cannot resolve.
 
 `_records.py` and `_provenance.py` are stdlib helper modules imported by
 the hook scripts above (not hooks themselves). Shared files
-(`ensure_llm_profiles.py`, `safety_rail.py`, `_provenance.py`,
-`_records.py`, `require_records.py`) are canonical across the family and
-hash-locked by `scripts/check_shared_hooks.py`.
+(`ensure_llm_profiles.py`, `ensure_agent_profiles.py`, `safety_rail.py`,
+`_provenance.py`, `_records.py`, `require_records.py`) are canonical across
+the family and hash-locked by `scripts/check_shared_hooks.py`.

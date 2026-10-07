@@ -1,8 +1,8 @@
 # Skills
 
 `plugins/mech/skills/` — keyword skills use `triggers:` (model-invocable);
-`mech-brief-rules` is a path-triggered rule (`paths:` glob, deterministic
-injection). The two mechanisms are exclusive.
+`mech-brief-rules` and `mech-out-rules` are path-triggered rules (`paths:`
+glob, deterministic injection). The two mechanisms are exclusive.
 
 | Skill | Kind | What it injects |
 |---|---|---|
@@ -13,3 +13,4 @@ injection). The two mechanisms are exclusive.
 | `mech-mechanism` | keyword | gear/snap/rib/boss/hinge/detent parametric rules |
 | `mech-dfm` | keyword | process limit tables and DFM rule expectations |
 | `mech-gates` | keyword | gate semantics, verdict handling, mandatory records section |
+| `mech-out-rules` | `paths:` rule on `**/out/**` | generated artifacts under `out/` are read-only projections — change the brief and regenerate (the `protect-generated` hook enforces) |
