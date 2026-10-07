@@ -245,15 +245,17 @@ jobs:
           - name: Scan tools image (Trivy JSON)
             if: inputs.skip_tools != true
             uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-            env:
-              # Shared cache so all Trivy scans in this run reuse one DB download.
-              TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
             with:
               scan-type: image
               # Scan the immutable sha tag — the same manifest the pushed
               # digest addresses on a real run, and the local image under
               # dry_run.
               scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
+              # Private cache dir: this leg runs inside a parallel group,
+              # and trivy-action's default cache-dir (.cache/trivy) would
+              # share the DB with other legs and corrupt db/metadata.json
+              # on concurrent writes.
+              cache-dir: ${{ runner.temp }}/trivy-tools-json
               version: v0.75.0
               scanners: vuln,secret,misconfig,license
               ignore-unfixed: false
@@ -300,14 +302,19 @@ jobs:
       - name: Scan tools image (Trivy SARIF)
         if: inputs.skip_tools != true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
           # Scan the immutable sha tag — the manifest the SBOM and
           # provenance attestations bind to on a real run (the local
           # image under dry_run).
           scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
+          # Shared warm DB dir; sequential legs may share it. Never place
+          # trivy-action legs inside a `parallel:` group with a shared
+          # cache-dir — concurrent writers corrupt the DB, and the action
+          # also round-trips env vars through ./trivy_envs.txt in the job
+          # cwd, which races the same way. TRIVY_CACHE_DIR env does NOT
+          # override the action's cache-dir input.
+          cache-dir: ${{ runner.temp }}/trivy-cache
           version: v0.75.0
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
@@ -434,13 +441,16 @@ jobs:
       - parallel:
           - name: Scan server image (Trivy JSON)
             uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-            env:
-              TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
             with:
               scan-type: image
               # SERVER_REF is the pushed digest on real runs and the local
               # rehearsal tag under dry_run.
               scan-ref: ${{ env.SERVER_REF }}
+              # Private cache dir: this leg runs inside a parallel group,
+              # and trivy-action's default cache-dir (.cache/trivy) would
+              # share the DB with other legs and corrupt db/metadata.json
+              # on concurrent writes.
+              cache-dir: ${{ runner.temp }}/trivy-server-json
               version: v0.75.0
               scanners: vuln,secret,misconfig,license
               ignore-unfixed: false
@@ -459,11 +469,10 @@ jobs:
                 --out "$RUNNER_TEMP/mech-server.json"
       - name: Scan server image (Trivy SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
         with:
           scan-type: image
           scan-ref: ${{ env.SERVER_REF }}
+          cache-dir: ${{ runner.temp }}/trivy-cache
           version: v0.75.0
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
