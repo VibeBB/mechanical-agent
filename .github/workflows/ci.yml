@@ -33,12 +33,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
-        include:
-          # Forward-compatibility canary ahead of the 2026-10-09 stable
-          # release: step-level continue-on-error keeps the leg green while
-          # the last step reports the failure as an annotation.
-          - python-version: "3.15"
-            experimental: true
     steps:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
@@ -50,49 +44,41 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         id: setup-uv
-        continue-on-error: ${{ matrix.experimental || false }}
         with:
           python-version: ${{ matrix.python-version }}
           cache-suffix: verify-${{ matrix.python-version }}
       - name: Sync dependencies
         id: sync-dependencies
-        continue-on-error: ${{ matrix.experimental || false }}
         # uv sync --locked stays sequential: it builds the venv every leg
         # below shares, so the first venv build is never concurrent.
         run: uv sync --locked
       # The five check legs are independent (disjoint output paths) and
       # run as background steps joined by the wait below. They keep their
-      # top-level id/continue-on-error (not a parallel: group) because the
-      # 3.15 canary report reads steps.<id>.outcome — actionlint cannot see
-      # ids inside parallel groups.
+      # top-level ids (not a parallel: group) so actionlint still resolves
+      # them.
       - name: Ruff
         id: ruff
         background: true
-        continue-on-error: ${{ matrix.experimental || false }}
         run: |
           uv run ruff check .
           uv run ruff format --check .
       - name: Pyright
         id: pyright
         background: true
-        continue-on-error: ${{ matrix.experimental || false }}
         run: uv run pyright
       - name: Pytest
         id: pytest
         background: true
-        continue-on-error: ${{ matrix.experimental || false }}
         # Same command as `verify_all.py --stage fast` so fail_under and the
         # [tool.vibebb-coverage] structural floors gate CI too.
         run: uv run python scripts/structural_coverage.py run --json out/structural-coverage.json
       - name: Docs
         id: docs
         background: true
-        continue-on-error: ${{ matrix.experimental || false }}
         run: uv run python scripts/verify_docs.py
       - name: Shared checks
         id: shared-checks
         background: true
-        continue-on-error: ${{ matrix.experimental || false }}
         run: |
           git diff --check
           uv run python scripts/check_shared_hooks.py
@@ -100,8 +86,68 @@ jobs:
 
       - name: Wait for check legs
         wait: [ruff, pyright, pytest, docs, shared-checks]
+
+  # Forward-compatibility canary ahead of the next stable release. Runs
+  # sequentially: a tolerated step failure inside a background leg can end
+  # the run as failure even when every job is green (observed on main),
+  # so the canary keeps ordinary steps plus per-step continue-on-error
+  # and reports failures as an annotation instead.
+  canary:
+    name: verify (3.15)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    env:
+      # The canary leg builds sdists (e.g. fastuuid's pinned PyO3)
+      # against a pre-release CPython; abi3 forward-compat mode lets
+      # the wheel target the stable ABI instead of refusing at build
+      # time.
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
+    steps:
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        id: setup-uv
+        continue-on-error: true
+        with:
+          python-version: "3.15"
+          cache-suffix: verify-3.15
+      - name: Sync dependencies
+        id: sync-dependencies
+        continue-on-error: true
+        run: uv sync --locked
+      - name: Ruff
+        id: ruff
+        continue-on-error: true
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Pyright
+        id: pyright
+        continue-on-error: true
+        run: uv run pyright
+      - name: Pytest
+        id: pytest
+        continue-on-error: true
+        run: uv run python scripts/structural_coverage.py run --json out/structural-coverage.json
+      - name: Docs
+        id: docs
+        continue-on-error: true
+        run: uv run python scripts/verify_docs.py
+      - name: Shared checks
+        id: shared-checks
+        continue-on-error: true
+        run: |
+          git diff --check
+          uv run python scripts/check_shared_hooks.py
+          uv run python scripts/check_shared_workflows.py
       - name: Report 3.15 canary outcome
-        if: matrix.experimental && (steps.setup-uv.outcome == 'failure' || steps.sync-dependencies.outcome == 'failure' || steps.ruff.outcome == 'failure' || steps.pyright.outcome == 'failure' || steps.pytest.outcome == 'failure' || steps.docs.outcome == 'failure' || steps.shared-checks.outcome == 'failure')
+        if: always() && (steps.setup-uv.outcome == 'failure' || steps.sync-dependencies.outcome == 'failure' || steps.ruff.outcome == 'failure' || steps.pyright.outcome == 'failure' || steps.pytest.outcome == 'failure' || steps.docs.outcome == 'failure' || steps.shared-checks.outcome == 'failure')
         run: |
           echo "::warning::Python 3.15 canary leg failed — forward-compat signal, not a gate failure"
   dockerfile-lint:
