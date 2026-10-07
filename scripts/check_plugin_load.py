@@ -23,6 +23,7 @@ EXPECTED_SKILLS = {
     "mech-mechanism",
     "mech-dfm",
     "mech-gates",
+    "mech-out-rules",
     "mech-workflow",
 }
 EXPECTED_COMMANDS = {"design", "doctor", "gates", "export"}
@@ -30,6 +31,7 @@ EXPECTED_SESSION_START_HOOKS = {
     "mech-doctor",
     "intake-attachments",
     "ensure-llm-profiles",
+    "ensure-agent-profiles",
     "require-records",
     "report-ux-inbox",
 }
