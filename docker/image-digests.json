@@ -1,10 +1,10 @@
 {
   "mech_server": {
-    "digest": "sha256:155f55a406ece5006dfcf4e33f43ac9b82cd9249a6e1acccdba839f292d2789b",
+    "digest": "sha256:30288abf9a678732d783657f8e8c44446b1f7b3946880aa93776309b40ded27d",
     "dockerfile": "sdk:openhands-agent-server/v1.53.0",
     "image": "ghcr.io/vibebb/mech-server",
-    "published_at": "2026-10-07T16:13:08Z",
-    "tag": "bcc3e7e-_tag_0792fc670a934c030f09346a64c194f6fca17b0ef80676-16cf8a556361-source",
+    "published_at": "2026-10-07T17:36:28Z",
+    "tag": "449db8f-_tag_3620c9bd4ed4efddfdee719d430d7d8f4adc65b3983417-a3370841e299-source",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
@@ -12,16 +12,16 @@
       "python": "Python 3.14.8",
       "uv": "0.12.23 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37648212702"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37658826642"
   },
   "mech_tools": {
-    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/53624127",
-    "digest": "sha256:0792fc670a934c030f09346a64c194f6fca17b0ef806760660d9def6b8429f42",
+    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/53648973",
+    "digest": "sha256:3620c9bd4ed4efddfdee719d430d7d8f4adc65b398341738b9535e625db80fdb",
     "dockerfile": "docker/mech-tools.Dockerfile",
     "image": "ghcr.io/vibebb/mech-tools",
-    "published_at": "2026-10-07T16:13:08Z",
-    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/53626106",
-    "tag": "bcc3e7e388cd8a32585e83290e789bbf82b130ab-tools",
+    "published_at": "2026-10-07T17:36:28Z",
+    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/53650125",
+    "tag": "449db8fe88c831914a4b6a92f4cf4f3dc109f4dd-tools",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
@@ -29,6 +29,6 @@
       "python": "Python 3.14.8",
       "uv": "0.12.23 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37648212702"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/37658826642"
   }
 }
