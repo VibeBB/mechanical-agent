@@ -408,12 +408,14 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     if name == "mech_author":
         export_design(brief, design, out_dir)
     from .board_geometry import resolve_source
+    from .sim_response import resolve_response
 
     report = run_gates(
         brief,
         design,
         out_dir,
         board_geometry_path=resolve_source(brief, workspace_root(), confine=True),
+        sim_response_path=resolve_response(brief, workspace_root(), confine=True),
     )
     renders: list[dict[str, Any]] | dict[str, Any] | None = None
     if name == "mech_author" and bool(arguments.get("render", True)):

@@ -86,6 +86,12 @@ simulation brief (board plate, vibration parts, drop pulse, IP code with the
 opening sizes) and a `kind: ruggedness` `*.sim-request.json`. simulation's
 `sim-liaison` answers with a `*.sim-response.json`; its gates own the
 verdict (dust and water IP digits stay `unknown` until a physical test).
+Set `enclosure.ruggedness.response_path` to that response and mech's
+`sim_ruggedness` gate reads it back: it is bound to the request and to the
+current brief by sha256, a stale or tampered answer fails, a missing or
+`needs_info` answer is `unknown`, and each simulation check (with its
+measured value and limit) appears in mech's gate report with simulation's
+own verdict.
 
 ## Appearance limit samples → production-engineering
 

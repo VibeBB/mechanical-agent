@@ -125,6 +125,17 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
 - `write_sim_request(brief, out_dir, *, root=None)` → writes the brief and
   `*.sim-request.json`; `root` makes `brief_path` workspace-relative.
 
+## sim_response.py
+
+- `SimResponse` — strict mirror of simulation's `SimulationResponse` v2.
+- `expected_request(brief)` → `(request_id, sim brief sha256)` the current
+  brief would request.
+- `resolve_response(brief, base_dir, *, confine=False)` → path of
+  `enclosure.ruggedness.response_path` (or `None`).
+- `ruggedness_findings(brief, response_path, root)` → `(subject, status,
+  measured, detail)` per check; fail-closed (see `contracts.md`). The
+  `sim_ruggedness` gate in `gates.py` wraps it.
+
 ## advisory.py / records.py / liaison.py / envelope.py
 
 - `build_review_record` / `write_review_record` → `review-visual-<slug>
