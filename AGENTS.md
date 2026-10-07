@@ -35,7 +35,7 @@ src/mech/                 # deterministic mechanical-design core
 └── cli.py                # python -m mech {doctor,intake,author,gates,export,dxf-lint,render}
 plugins/mech/             # OpenHands plugin
 ├── skills/               # mech-brief, mech-brief-rules, mech-enclosure,
-│                         # mech-mechanism,
+│                         # mech-mechanism, mech-out-rules,
 │                         # mech-dfm, mech-gates, mech-workflow
 ├── agents/               # mech-brief, mech-design, mech-review (task sub-agents)
 ├── commands/             # /mech:design, /mech:doctor, /mech:gates, /mech:export
@@ -94,8 +94,9 @@ docs/adr/  docs/research/
 
 - MCP filesystem paths are confined to `OPENHANDS_PROJECT_DIR` by
   `src/mech/workspace.py`; CLI paths remain unchanged.
-- `ensure_llm_profiles.py` and `safety_rail.py` are canonical across all nine
-  plugin repositories and checked by `scripts/check_shared_hooks.py`.
+- `ensure_llm_profiles.py`, `ensure_agent_profiles.py` and `safety_rail.py`
+  are canonical across all nine plugin repositories and checked by
+  `scripts/check_shared_hooks.py`.
   `_provenance.py` is shared where present; UX and Production Engineering
   intentionally omit it. Mechanical's other hooks are
   `intake_attachments.py`, `protect_generated.py`,

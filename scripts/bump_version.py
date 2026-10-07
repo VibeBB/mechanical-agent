@@ -23,6 +23,7 @@ VERSION_FILES = [
     "plugins/mech/skills/mech-enclosure/SKILL.md",
     "plugins/mech/skills/mech-gates/SKILL.md",
     "plugins/mech/skills/mech-mechanism/SKILL.md",
+    "plugins/mech/skills/mech-out-rules/SKILL.md",
     "plugins/mech/skills/mech-workflow/SKILL.md",
 ]
 
@@ -35,6 +36,7 @@ _PATTERNS = {
     "plugins/mech/skills/mech-enclosure/SKILL.md": re.compile(r"(?m)^version: (.+)$"),
     "plugins/mech/skills/mech-gates/SKILL.md": re.compile(r"(?m)^version: (.+)$"),
     "plugins/mech/skills/mech-mechanism/SKILL.md": re.compile(r"(?m)^version: (.+)$"),
+    "plugins/mech/skills/mech-out-rules/SKILL.md": re.compile(r"(?m)^version: (.+)$"),
     "plugins/mech/skills/mech-workflow/SKILL.md": re.compile(r"(?m)^version: (.+)$"),
 }
 

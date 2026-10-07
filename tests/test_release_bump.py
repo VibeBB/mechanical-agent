@@ -19,6 +19,7 @@ SKILLS = (
     "mech-enclosure",
     "mech-gates",
     "mech-mechanism",
+    "mech-out-rules",
     "mech-workflow",
 )
 
