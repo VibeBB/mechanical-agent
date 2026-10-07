@@ -32,6 +32,8 @@ jobs:
     # Covers the slow path: direct-push rejection → bump PR + dispatched
     # checks + merge wait.
     timeout-minutes: 45
+    # No actions/cache usage: forbid restore and save entirely.
+    cache-mode: none
     # actions approves approval-gated runs and dispatches the bump-branch
     # checks; contents pushes the bump commit (or its PR branch);
     # pull-requests opens and merges the version-bump PR.
@@ -104,6 +106,8 @@ jobs:
     needs: [bump-version, verify, install-smoke]
     runs-on: ubuntu-26.04
     timeout-minutes: 15
+    # No actions/cache usage: forbid restore and save entirely.
+    cache-mode: none
     permissions:
       # Creates the GitHub release and its v<version> tag.
       contents: write

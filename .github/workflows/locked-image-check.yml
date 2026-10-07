@@ -26,6 +26,8 @@ jobs:
   check-lock:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    # No actions/cache usage: forbid restore and save entirely.
+    cache-mode: none
     outputs:
       present: ${{ steps.lock.outputs.present }}
       attestation: ${{ steps.lock.outputs.attestation }}
@@ -147,40 +149,48 @@ jobs:
           python-version: "3.14"
           cache-suffix: locked-image-check
       - run: uv sync --locked
-      - run: uv run python scripts/pull_locked_image.py --entry mech_tools
+      # The ref is resolved from the lock file, not the pulled image, so
+      # this stays before the parallel group that reads its output.
       - id: image
         run: echo "ref=$(uv run python scripts/print_locked_image.py --entry mech_tools)" >> "$GITHUB_OUTPUT"
-      - name: Verify tools image provenance
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMAGE_REF: ${{ steps.image.outputs.ref }}
-          ATTESTATION: ${{ needs.check-lock.outputs.attestation }}
-        run: |
-          set -euo pipefail
-          if [ -z "$ATTESTATION" ]; then
-            echo "::warning::mech_tools lock has no provenance attestation; continuing"
-            exit 0
-          fi
-          image="${IMAGE_REF%@*}"
-          digest="${IMAGE_REF#*@}"
-          gh attestation verify "oci://${image}@${digest}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"
-      - name: Warn when tools image has no SBOM attestation
-        if: needs.check-lock.outputs.sbom_attestation == ''
-        run: echo "::warning::mech_tools image lock has no SBOM attestation; continuing"
-      - name: Verify tools image SBOM attestation
-        if: needs.check-lock.outputs.sbom_attestation != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMAGE_REF: ${{ steps.image.outputs.ref }}
-        run: |
-          image="${IMAGE_REF%@*}"
-          digest="${IMAGE_REF#*@}"
-          gh attestation verify "oci://${image}@${digest}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml" \
-            --predicate-type https://spdx.dev/Document/v2.3
+      # The image pull and the registry-side attestation checks only need
+      # the lock contents — not each other — so they run as one parallel
+      # group and the pulled image is guaranteed present by the implicit
+      # wait before the smoke leg below.
+      - parallel:
+          - name: Pull locked image
+            run: uv run python scripts/pull_locked_image.py --entry mech_tools
+          - name: Verify tools image provenance
+            env:
+              GH_TOKEN: ${{ github.token }}
+              IMAGE_REF: ${{ steps.image.outputs.ref }}
+              ATTESTATION: ${{ needs.check-lock.outputs.attestation }}
+            run: |
+              set -euo pipefail
+              if [ -z "$ATTESTATION" ]; then
+                echo "::warning::mech_tools lock has no provenance attestation; continuing"
+                exit 0
+              fi
+              image="${IMAGE_REF%@*}"
+              digest="${IMAGE_REF#*@}"
+              gh attestation verify "oci://${image}@${digest}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"
+          - name: Warn when tools image has no SBOM attestation
+            if: needs.check-lock.outputs.sbom_attestation == ''
+            run: echo "::warning::mech_tools image lock has no SBOM attestation; continuing"
+          - name: Verify tools image SBOM attestation
+            if: needs.check-lock.outputs.sbom_attestation != ''
+            env:
+              GH_TOKEN: ${{ github.token }}
+              IMAGE_REF: ${{ steps.image.outputs.ref }}
+            run: |
+              image="${IMAGE_REF%@*}"
+              digest="${IMAGE_REF#*@}"
+              gh attestation verify "oci://${image}@${digest}" \
+                --repo "$GITHUB_REPOSITORY" \
+                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml" \
+                --predicate-type https://spdx.dev/Document/v2.3
       # e2e_authoring exits non-zero unless the gate verdict is "pass"
       # (fail-closed), so the container exit code is the smoke check. The
       # smoke files are mounted from runner temp for failure artifacts.

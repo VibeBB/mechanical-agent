@@ -9,7 +9,7 @@ checkable, so they get a regression test here instead of another audit.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -23,6 +23,21 @@ def _load(name: str) -> dict[Any, Any]:
     # key as boolean True (YAML 1.1).
     data: dict[Any, Any] = yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
     return data
+
+
+def _flatten_steps(steps: list[Any]) -> list[dict[Any, Any]]:
+    # A `parallel:` entry's members all complete before the steps that
+    # follow the group, so splicing them into the sequence keeps ordering
+    # assertions (gate-before-promote) and per-step checks (if:, uses:)
+    # meaningful for nested steps.
+    flat: list[dict[Any, Any]] = []
+    for step in steps:
+        members = cast(dict[Any, Any], step).get("parallel")
+        if members:
+            flat.extend(cast(list[dict[Any, Any]], members))
+        else:
+            flat.append(cast(dict[Any, Any], step))
+    return flat
 
 
 def _on(data: dict[Any, Any]) -> dict[Any, Any]:
@@ -87,7 +102,7 @@ def test_container_audit_cis_aggregation_walks_nested_results_and_fails_loud() -
 
 def test_publish_never_pushes_latest_before_the_trivy_gate() -> None:
     data = _load("publish-mech-images.yml")
-    steps: list[dict[Any, Any]] = data["jobs"]["publish"]["steps"]
+    steps = _flatten_steps(data["jobs"]["publish"]["steps"])
     for step in steps:
         if "docker/build-push-action" in (step.get("uses") or ""):
             with_block: dict[Any, Any] = step.get("with") or {}
@@ -116,7 +131,7 @@ def test_publish_never_pushes_latest_before_the_trivy_gate() -> None:
 
 def test_ci_pytest_enforces_the_coverage_floor() -> None:
     data = _load("ci.yml")
-    steps: list[dict[Any, Any]] = data["jobs"]["verify"]["steps"]
+    steps = _flatten_steps(data["jobs"]["verify"]["steps"])
     runs = [s.get("run") or "" for s in steps]
     assert any(r.startswith("uv run python scripts/verify_all.py") for r in runs) or any(
         r.startswith("uv run python scripts/structural_coverage.py run") for r in runs
