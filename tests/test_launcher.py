@@ -195,3 +195,18 @@ def test_warn_fallback_json_matches_doctor_key(capsys: pytest.CaptureFixture[str
     assert module._warn_or_die("boom", ["doctor", "--warn"]) == 0
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert payload == {"verdict": "fail", "detail": "boom"}
+
+
+def test_container_user_rootless(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rootless daemons get 0:0 — the host uid maps to an unusable subuid."""
+    module = _load_launcher()
+    monkeypatch.setattr(
+        module,
+        "_docker_info_security_options",
+        lambda: '["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]',
+    )
+    assert module._container_user() == "0:0"
+    argv = module._docker_argv(image="img", source=None, inner_argv=["doctor"])
+    assert argv[argv.index("--user") + 1] == "0:0"
+    monkeypatch.setattr(module, "_docker_info_security_options", lambda: None)
+    assert module._container_user() == f"{os.getuid()}:{os.getgid()}"
