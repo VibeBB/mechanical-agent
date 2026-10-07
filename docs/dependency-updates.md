@@ -12,8 +12,8 @@ the adoption decision for each. Update it in the same change that touches
 | ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.52.0` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.52.0` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.53.0` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.53.0` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
@@ -147,7 +147,7 @@ only while `review_by` has not passed and still matches the reported
 
 | Surface | Name | Latest | Re-check | Reason |
 | --- | --- | --- | --- | --- |
-| pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.52.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
+| pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.53.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
 
 ## Not covered
 
@@ -155,6 +155,13 @@ only while `review_by` has not passed and still matches the reported
 - Transitive dependencies stay pinned in `uv.lock`; the `pypi-lock`
   surface reports drift but bumps still ride direct spec changes
   (`uv lock --upgrade` when applied).
+
+## Decisions - 2026-10-07 round (SDK 1.53.0)
+
+| Component | From -> To | Decision |
+| --- | --- | --- |
+| `openhands-sdk` / `openhands-tools` (main deps) | 1.52.0 -> 1.53.0 | Adopted. All 6 upstream PRs reviewed; see [SDK v1.53.0 feature evaluation](research/sdk-v1.53.0-feature-evaluation.md). mech-server rides `sdk:openhands-agent-server/v${SDK_VERSION}` from the lock pin at publish time — no committed lock is edited. |
+| mcp | stays <2 | Deferred: `openhands-sdk` 1.53.0 still requires `fastmcp<4` -> `mcp<2`; reason refreshed to cite 1.53.0, `review_by` unchanged. |
 
 ## Decisions - 2026-10-05 round (SDK 1.52.0)
 
