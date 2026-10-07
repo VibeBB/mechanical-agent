@@ -26,29 +26,38 @@ LABEL org.opencontainers.image.source="https://github.com/VibeBB/mechanical-agen
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get -o Acquire::Retries=5 install --no-install-recommends -y \
-        ca-certificates \
-        curl \
-        git \
-        xz-utils \
-        libgl1 \
-        libglu1-mesa \
-        libx11-6 \
-        libxi6 \
-        libxmu6 \
-        libxrender1 \
-        libxt6t64 \
-        libxext6 \
-        libfreetype6 \
-        libfontconfig1 \
-        librsvg2-bin \
-    # The pinned base digest keeps shipping libpcre2-8-0 10.46-1~deb13u2;
-    # upgrade it in-build to the fixed deb13u3 (CVE-2026-103111) so the
-    # publish-time Trivy gate stays green between base-digest bumps.
-    && apt-get -o Acquire::Retries=5 install --no-install-recommends \
-        --only-upgrade -y libpcre2-8-0 \
-    && rm -rf /var/lib/apt/lists/*
+# apt resilience: Acquire::Retries covers single fetches, not a mirror that
+# is down for minutes (archive.ubuntu.com outage killed several builds).
+# Retry the whole update+install round with bounded backoff.
+RUN for attempt in 1 2 3 4 5; do \
+        apt-get -o Acquire::Retries=5 update \
+        && apt-get -o Acquire::Retries=5 install --no-install-recommends -y \
+            ca-certificates \
+            curl \
+            git \
+            xz-utils \
+            libgl1 \
+            libglu1-mesa \
+            libx11-6 \
+            libxi6 \
+            libxmu6 \
+            libxrender1 \
+            libxt6t64 \
+            libxext6 \
+            libfreetype6 \
+            libfontconfig1 \
+            librsvg2-bin \
+        # The pinned base digest keeps shipping libpcre2-8-0 10.46-1~deb13u2;
+        # upgrade it in-build to the fixed deb13u3 (CVE-2026-103111) so the
+        # publish-time Trivy gate stays green between base-digest bumps.
+        && apt-get -o Acquire::Retries=5 install --no-install-recommends \
+            --only-upgrade -y libpcre2-8-0 \
+        && rm -rf /var/lib/apt/lists/* \
+        && break; \
+        [ "$attempt" = 5 ] && exit 1; \
+        echo "::warning::apt update+install attempt ${attempt} failed; retrying"; \
+        sleep $((attempt * 30)); \
+    done
 
 # The uv-managed CPython bundles pip with vendored copies of urllib3,
 # msgpack, and setuptools that nothing in the image invokes — dependencies
