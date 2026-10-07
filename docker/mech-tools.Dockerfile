@@ -30,8 +30,8 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 # is down for minutes (archive.ubuntu.com outage killed several builds).
 # Retry the whole update+install round with bounded backoff.
 RUN for attempt in 1 2 3 4 5; do \
-        apt-get -o Acquire::Retries=5 update \
-        && apt-get -o Acquire::Retries=5 install --no-install-recommends -y \
+        apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update \
+        && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends -y \
             ca-certificates \
             curl \
             git \
@@ -50,7 +50,7 @@ RUN for attempt in 1 2 3 4 5; do \
         # The pinned base digest keeps shipping libpcre2-8-0 10.46-1~deb13u2;
         # upgrade it in-build to the fixed deb13u3 (CVE-2026-103111) so the
         # publish-time Trivy gate stays green between base-digest bumps.
-        && apt-get -o Acquire::Retries=5 install --no-install-recommends \
+        && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends \
             --only-upgrade -y libpcre2-8-0 \
         && rm -rf /var/lib/apt/lists/* \
         && break; \
