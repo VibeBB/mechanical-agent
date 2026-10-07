@@ -134,26 +134,157 @@ jobs:
           # imports already degrade to a miss rather than an error, so
           # ignore-error applies to cache-to only.
           cache-to: type=gha,mode=max,ignore-error=true
-      # The full JSON scan runs before the SARIF gate so the diagnostic
-      # report exists even when the gate fails — exactly when it is needed.
-      - name: Scan tools image (Trivy JSON)
-        if: inputs.skip_tools != true
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Resolve tools digest
         env:
-          # Shared cache so all Trivy scans in this run reuse one DB download.
-          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+          BUILT_DIGEST: ${{ steps.tools.outputs.digest }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.skip_tools }}" = true ]; then
+            TOOLS_REF=$(uv run python scripts/print_locked_image.py --entry mech_tools)
+            uv run python scripts/pull_locked_image.py --entry mech_tools --record "$RUNNER_TEMP/pull-tools.json"
+            TOOLS_TAG=$(python3 -c 'import json; print(json.load(open("docker/image-digests.json", encoding="utf-8"))["mech_tools"]["tag"])')
+          elif [ "$DRY_RUN" = "true" ]; then
+            # Nothing was pushed: retag the daemon-local image under a
+            # slash-free name the measurement probe accepts, and reference
+            # it everywhere below.
+            docker tag \
+              "ghcr.io/${IMAGE_OWNER}/mech-tools:${SOURCE_SHA}-tools" \
+              "mech-tools:${SOURCE_SHA}-rehearsal"
+            TOOLS_REF="mech-tools:${SOURCE_SHA}-rehearsal"
+            TOOLS_DIGEST="${BUILT_DIGEST:-unpublished}"
+            TOOLS_TAG="${SOURCE_SHA}-tools"
+          else
+            case "$BUILT_DIGEST" in sha256:*) ;; *) echo "invalid tools digest: $BUILT_DIGEST" >&2; exit 1 ;; esac
+            TOOLS_REF="ghcr.io/${IMAGE_OWNER}/mech-tools@${BUILT_DIGEST}"
+            TOOLS_TAG="${SOURCE_SHA}-tools"
+          fi
+          printf 'TOOLS_REF=%s\nTOOLS_DIGEST=%s\nTOOLS_TAG=%s\n' "$TOOLS_REF" "${TOOLS_DIGEST:-${TOOLS_REF##*@}}" "$TOOLS_TAG" >> "$GITHUB_ENV"
+      # Attestation only needs the pushed digest: run it as a background
+      # step overlapping every post-build leg and join it before the
+      # digest-lock update that reads its attestation-url output.
+      - name: Attest tools image provenance
+        id: attest
+        if: inputs.skip_tools != true && inputs.dry_run != true
+        background: true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          scan-type: image
-          # Scan the immutable sha tag — the same manifest the pushed
-          # digest addresses on a real run, and the local image under
-          # dry_run.
-          scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
-          version: v0.75.0
-          scanners: vuln,secret,misconfig,license
-          ignore-unfixed: false
-          exit-code: '0'
-          format: json
-          output: trivy-mech-tools-report.json
+          subject-name: ghcr.io/vibebb/mech-tools
+          subject-digest: ${{ steps.tools.outputs.digest }}
+          push-to-registry: true
+      - name: Clone OpenHands SDK
+        run: git clone --depth 1 --branch "v${SDK_VERSION}" https://github.com/OpenHands/software-agent-sdk "$RUNNER_TEMP/sdk"
+      - name: Stabilize server build cache tag
+        # Upstream keys the registry cache tag on the base-image digest, so
+        # every new tools digest opens a fresh (empty) cache namespace and
+        # the importer logs "not found" on every publish. The
+        # base-image-independent builder/binary-builder/acp-providers stages
+        # are the bulk of the server build, so point the cache at a stable
+        # per-target tag. Fail-open: if upstream renames the property, build
+        # unpatched rather than break.
+        run: |
+          set -euo pipefail
+          f="$RUNNER_TEMP/sdk/openhands-agent-server/openhands/agent_server/docker/build.py"
+          needle='buildcache-{self.target}-{self.base_image_slug}{self.flavor_suffix}'
+          replacement='buildcache-{self.target}{self.flavor_suffix}'
+          if grep -qF "$needle" "$f"; then
+            sed -i "s/$needle/$replacement/" "$f"
+            grep -qF "$replacement" "$f"
+            echo "patched: registry cache tag is now buildcache-<target>-main"
+          else
+            echo "::warning::upstream build.py cache_tags layout changed; building without stable cache tag"
+          fi
+      # The server build needs only TOOLS_REF (its base image): it is
+      # genuinely independent of the tools scan/SBOM/measure/smoke legs,
+      # so it runs as a background step overlapping them and is joined
+      # before its tags_csv output is read. A tools-gate failure cancels
+      # it mid-build, which may leave an unpromoted immutable server tag —
+      # the same orphan a server-gate failure leaves today.
+      - id: build_server
+        name: Build and publish server
+        background: true
+        env:
+          SDK_SHA: ${{ github.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          # No CUSTOM_TAGS: the mutable tags (<sha>-latest-source and
+          # main-latest-source) are promoted after every gate below passes,
+          # so a failed scan never serves a new mutable tag.
+        run: |
+          set -euo pipefail
+          # dry_run loads the server image into the local daemon instead
+          # of pushing it; every gate below still runs against it.
+          push_flag=--push
+          if [ "$DRY_RUN" = "true" ]; then
+            push_flag=--load
+          fi
+          uv run --project "$RUNNER_TEMP/sdk" python \
+            "$RUNNER_TEMP/sdk/openhands-agent-server/openhands/agent_server/docker/build.py" \
+            --base-image "$TOOLS_REF" --image "ghcr.io/${IMAGE_OWNER}/mech-server" \
+            --target source --platforms linux/amd64 "$push_flag" --sdk-project-root "$RUNNER_TEMP/sdk"
+      - name: Sync dependencies
+        # Prebuild the repo venv before the parallel legs so the first
+        # uv sync is not concurrent.
+        run: uv sync --locked
+      # Independent post-build legs run as a parallel group; the implicit
+      # wait at the group end still lands the full JSON scan before the
+      # SARIF gate, so the diagnostic report exists even when the gate
+      # fails — exactly when it is needed.
+      - parallel:
+          - name: Scan tools image (Trivy JSON)
+            if: inputs.skip_tools != true
+            uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+            env:
+              # Shared cache so all Trivy scans in this run reuse one DB download.
+              TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+            with:
+              scan-type: image
+              # Scan the immutable sha tag — the same manifest the pushed
+              # digest addresses on a real run, and the local image under
+              # dry_run.
+              scan-ref: ghcr.io/${{ env.IMAGE_OWNER }}/mech-tools:${{ github.sha }}-tools
+              version: v0.75.0
+              scanners: vuln,secret,misconfig,license
+              ignore-unfixed: false
+              exit-code: '0'
+              format: json
+              output: trivy-mech-tools-report.json
+          - name: Generate tools SPDX SBOM
+            if: inputs.skip_tools != true
+            uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+            env:
+              # dry_run reads the just-built image from the local daemon.
+              SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: ${{ inputs.dry_run == true && 'docker' || 'registry' }}
+              TMPDIR: ${{ runner.temp }}
+              SYFT_FILE_METADATA_SELECTION: none
+            with:
+              image: ${{ env.TOOLS_REF }}
+              format: spdx-json
+              output-file: ${{ runner.temp }}/mech-tools.full.spdx.json
+              upload-artifact: false
+              upload-release-assets: false
+          - name: Measure published tools
+            env:
+              TOOLS_REF: ${{ env.TOOLS_REF }}
+            run: uv run python scripts/measure_image_tools.py --image-ref "$TOOLS_REF" --out "$RUNNER_TEMP/mech-tools.json"
+          # e2e_authoring exits non-zero unless the gate verdict is "pass"
+          # (fail-closed), so the container exit code is the smoke check. The
+          # mounted output is uploaded even when the smoke fails.
+          - name: Verify published tools smoke
+            env:
+              TOOLS_REF: ${{ env.TOOLS_REF }}
+              DRY_RUN: ${{ inputs.dry_run }}
+            run: |
+              set -euo pipefail
+              mkdir -p "$RUNNER_TEMP/mech-smoke"
+              chmod 777 "$RUNNER_TEMP/mech-smoke"
+              # dry_run already holds the image in the local daemon.
+              if [ "$DRY_RUN" != "true" ]; then
+                docker pull "$TOOLS_REF"
+              fi
+              docker run --rm --user mech \
+                --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$TOOLS_REF" \
+                python /opt/mech/scripts/e2e_authoring.py \
+                  --brief /opt/mech/examples/enclosure.brief.json --out /tmp/mech-smoke/enclosure
       - name: Scan tools image (Trivy SARIF)
         if: inputs.skip_tools != true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -193,54 +324,6 @@ jobs:
           name: mech-tools-trivy
           path: trivy-mech-tools-report.json
           retention-days: 90
-      - name: Attest tools image provenance
-        id: attest
-        if: inputs.skip_tools != true && inputs.dry_run != true
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ghcr.io/vibebb/mech-tools
-          subject-digest: ${{ steps.tools.outputs.digest }}
-          push-to-registry: true
-      - name: Resolve tools digest
-        env:
-          BUILT_DIGEST: ${{ steps.tools.outputs.digest }}
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          set -euo pipefail
-          if [ "${{ inputs.skip_tools }}" = true ]; then
-            TOOLS_REF=$(uv run python scripts/print_locked_image.py --entry mech_tools)
-            uv run python scripts/pull_locked_image.py --entry mech_tools --record "$RUNNER_TEMP/pull-tools.json"
-            TOOLS_TAG=$(python3 -c 'import json; print(json.load(open("docker/image-digests.json", encoding="utf-8"))["mech_tools"]["tag"])')
-          elif [ "$DRY_RUN" = "true" ]; then
-            # Nothing was pushed: retag the daemon-local image under a
-            # slash-free name the measurement probe accepts, and reference
-            # it everywhere below.
-            docker tag \
-              "ghcr.io/${IMAGE_OWNER}/mech-tools:${SOURCE_SHA}-tools" \
-              "mech-tools:${SOURCE_SHA}-rehearsal"
-            TOOLS_REF="mech-tools:${SOURCE_SHA}-rehearsal"
-            TOOLS_DIGEST="${BUILT_DIGEST:-unpublished}"
-            TOOLS_TAG="${SOURCE_SHA}-tools"
-          else
-            case "$BUILT_DIGEST" in sha256:*) ;; *) echo "invalid tools digest: $BUILT_DIGEST" >&2; exit 1 ;; esac
-            TOOLS_REF="ghcr.io/${IMAGE_OWNER}/mech-tools@${BUILT_DIGEST}"
-            TOOLS_TAG="${SOURCE_SHA}-tools"
-          fi
-          printf 'TOOLS_REF=%s\nTOOLS_DIGEST=%s\nTOOLS_TAG=%s\n' "$TOOLS_REF" "${TOOLS_DIGEST:-${TOOLS_REF##*@}}" "$TOOLS_TAG" >> "$GITHUB_ENV"
-      - name: Generate tools SPDX SBOM
-        if: inputs.skip_tools != true
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        env:
-          # dry_run reads the just-built image from the local daemon.
-          SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: ${{ inputs.dry_run == true && 'docker' || 'registry' }}
-          TMPDIR: ${{ runner.temp }}
-          SYFT_FILE_METADATA_SELECTION: none
-        with:
-          image: ${{ env.TOOLS_REF }}
-          format: spdx-json
-          output-file: ${{ runner.temp }}/mech-tools.full.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
       - name: Package tools SPDX SBOM
         if: inputs.skip_tools != true
         run: |
@@ -273,9 +356,13 @@ jobs:
           if sbom.get("spdxVersion") != "SPDX-2.3":
               raise SystemExit("tools SBOM must use SPDX-2.3")
           PY
+      # The SBOM attestation needs only the packaged SPDX file: run it as
+      # a background step and join it with the provenance attestation
+      # before the digest-lock update that reads both outputs.
       - name: Attest tools SBOM
         if: inputs.skip_tools != true && inputs.dry_run != true
         id: attest_sbom
+        background: true
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ghcr.io/vibebb/mech-tools
@@ -290,77 +377,14 @@ jobs:
           path: ${{ runner.temp }}/mech-tools.full.spdx.json
           retention-days: 90
           if-no-files-found: error
-      - name: Measure published tools
-        env:
-          TOOLS_REF: ${{ env.TOOLS_REF }}
-        run: uv run python scripts/measure_image_tools.py --image-ref "$TOOLS_REF" --out "$RUNNER_TEMP/mech-tools.json"
-      # e2e_authoring exits non-zero unless the gate verdict is "pass"
-      # (fail-closed), so the container exit code is the smoke check. The
-      # mounted output is uploaded even when the smoke fails.
-      - name: Verify published tools smoke
-        env:
-          TOOLS_REF: ${{ env.TOOLS_REF }}
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/mech-smoke"
-          chmod 777 "$RUNNER_TEMP/mech-smoke"
-          # dry_run already holds the image in the local daemon.
-          if [ "$DRY_RUN" != "true" ]; then
-            docker pull "$TOOLS_REF"
-          fi
-          docker run --rm --user mech \
-            --volume "$RUNNER_TEMP/mech-smoke:/tmp/mech-smoke" "$TOOLS_REF" \
-            python /opt/mech/scripts/e2e_authoring.py \
-              --brief /opt/mech/examples/enclosure.brief.json --out /tmp/mech-smoke/enclosure
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: mech-published-image-smoke
           path: ${{ runner.temp }}/mech-smoke/
           if-no-files-found: ignore
-      - name: Clone OpenHands SDK
-        run: git clone --depth 1 --branch "v${SDK_VERSION}" https://github.com/OpenHands/software-agent-sdk "$RUNNER_TEMP/sdk"
-      - name: Stabilize server build cache tag
-        # Upstream keys the registry cache tag on the base-image digest, so
-        # every new tools digest opens a fresh (empty) cache namespace and
-        # the importer logs "not found" on every publish. The
-        # base-image-independent builder/binary-builder/acp-providers stages
-        # are the bulk of the server build, so point the cache at a stable
-        # per-target tag. Fail-open: if upstream renames the property, build
-        # unpatched rather than break.
-        run: |
-          set -euo pipefail
-          f="$RUNNER_TEMP/sdk/openhands-agent-server/openhands/agent_server/docker/build.py"
-          needle='buildcache-{self.target}-{self.base_image_slug}{self.flavor_suffix}'
-          replacement='buildcache-{self.target}{self.flavor_suffix}'
-          if grep -qF "$needle" "$f"; then
-            sed -i "s/$needle/$replacement/" "$f"
-            grep -qF "$replacement" "$f"
-            echo "patched: registry cache tag is now buildcache-<target>-main"
-          else
-            echo "::warning::upstream build.py cache_tags layout changed; building without stable cache tag"
-          fi
-      - id: build_server
-        name: Build and publish server
-        env:
-          SDK_SHA: ${{ github.sha }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          # No CUSTOM_TAGS: the mutable tags (<sha>-latest-source and
-          # main-latest-source) are promoted after every gate below passes,
-          # so a failed scan never serves a new mutable tag.
-        run: |
-          set -euo pipefail
-          # dry_run loads the server image into the local daemon instead
-          # of pushing it; every gate below still runs against it.
-          push_flag=--push
-          if [ "$DRY_RUN" = "true" ]; then
-            push_flag=--load
-          fi
-          uv run --project "$RUNNER_TEMP/sdk" python \
-            "$RUNNER_TEMP/sdk/openhands-agent-server/openhands/agent_server/docker/build.py" \
-            --base-image "$TOOLS_REF" --image "ghcr.io/${IMAGE_OWNER}/mech-server" \
-            --target source --platforms linux/amd64 "$push_flag" --sdk-project-root "$RUNNER_TEMP/sdk"
+      - name: Wait for server build
+        wait: build_server
       - name: Resolve server digest
         env:
           BUILD_TAGS_CSV: ${{ steps.build_server.outputs.tags_csv }}
@@ -392,25 +416,35 @@ jobs:
           fi
           case "$SERVER_DIGEST" in sha256:*) ;; *) echo "invalid server digest: $SERVER_DIGEST" >&2; exit 1 ;; esac
           printf 'SERVER_TAG=%s\nSERVER_DIGEST=%s\nSERVER_REF=%s\n' "$SERVER_TAG" "$SERVER_DIGEST" "$SERVER_REF" >> "$GITHUB_ENV"
-      - name: Scan server image (Trivy JSON)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
-        with:
-          scan-type: image
-          # SERVER_REF is the pushed digest on real runs and the local
-          # rehearsal tag under dry_run.
-          scan-ref: ${{ env.SERVER_REF }}
-          version: v0.75.0
-          scanners: vuln,secret,misconfig,license
-          ignore-unfixed: false
-          exit-code: '0'
-          format: json
-          output: trivy-mech-server-report.json
-          # The upstream agent-server image vendors >10MB web assets
-          # (workbench.js, pydeck index.js.map) that trivy's secret scanner
-          # skips silently; naming them makes the blind spot deliberate.
-          skip-files: "**/workbench.js,**/index.js.map"
+      # The server JSON scan and the image measurement are independent:
+      # they run as a parallel group whose implicit wait still lands the
+      # JSON report before the SARIF gate below.
+      - parallel:
+          - name: Scan server image (Trivy JSON)
+            uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+            env:
+              TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+            with:
+              scan-type: image
+              # SERVER_REF is the pushed digest on real runs and the local
+              # rehearsal tag under dry_run.
+              scan-ref: ${{ env.SERVER_REF }}
+              version: v0.75.0
+              scanners: vuln,secret,misconfig,license
+              ignore-unfixed: false
+              exit-code: '0'
+              format: json
+              output: trivy-mech-server-report.json
+              # The upstream agent-server image vendors >10MB web assets
+              # (workbench.js, pydeck index.js.map) that trivy's secret scanner
+              # skips silently; naming them makes the blind spot deliberate.
+              skip-files: "**/workbench.js,**/index.js.map"
+          - name: Measure published server
+            run: |
+              set -euo pipefail
+              uv run python scripts/measure_image_tools.py \
+                --image-ref "$SERVER_REF" \
+                --out "$RUNNER_TEMP/mech-server.json"
       - name: Scan server image (Trivy SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
@@ -447,12 +481,8 @@ jobs:
           name: mech-server-trivy
           path: trivy-mech-server-report.json
           retention-days: 90
-      - name: Measure published server
-        run: |
-          set -euo pipefail
-          uv run python scripts/measure_image_tools.py \
-            --image-ref "$SERVER_REF" \
-            --out "$RUNNER_TEMP/mech-server.json"
+      - name: Wait for attestations
+        wait: [attest, attest_sbom]
       - name: Record published image summary
         env:
           SKIP_TOOLS: ${{ inputs.skip_tools }}

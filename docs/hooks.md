@@ -38,7 +38,7 @@ loud when the plugin root cannot resolve.
 | Hook | Matcher | Behavior |
 |---|---|---|
 | `record-vision-tool-event` | `inspect_image_with_vision` | exit 0; appends `{sequence, event_id, question, profile_name, model, response_sha256, session_id}` to `vision-tool-events.jsonl` |
-| `record-image-observation` | `file_editor\|mech_render\|mech_render_views\|mech_author` | exit 0; hashes every image path the tool touched/returned (including the inline `mech_author` views PNG) into `image-observations.jsonl` `{sequence, event_id, tool_name, image_path, image_sha256, recorded_at, session_id, actor, tool_call_id}` |
+| `record-image-observation` | `file_editor\|mech_render\|mech_render_views\|mech_render_section\|mech_author` | exit 0; hashes every image path the tool touched/returned (including the inline `mech_author` views PNG) into `image-observations.jsonl` `{sequence, event_id, tool_name, image_path, image_sha256, recorded_at, session_id, actor, tool_call_id}` |
 
 `_records.py` and `_provenance.py` are stdlib helper modules imported by
 the hook scripts above (not hooks themselves). Shared files

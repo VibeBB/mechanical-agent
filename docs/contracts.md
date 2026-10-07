@@ -85,6 +85,23 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   points at simulation's `*.sim-response.json` (relative to the brief, or to
   the workspace for MCP); it is not part of the simulation brief, so moving
   it does not change the request.
+- `appearance` (optional, any design type) — `viewing` (`distance_mm`,
+  `illuminance_lux`, `time_s`, `angle_deg` 0–90, `source` required),
+  `surfaces[]` (`face` from the design type's faces: enclosure
+  front/back/left/right/top/bottom, bracket base/leg/plate, spur_gear
+  face/hub/bore/teeth; `cosmetic_class` A/B/C; `defects[]` of `defect`,
+  `max_count`, and `max_size_mm` — or `max_delta` for `color_deviation` /
+  `gloss_deviation`), and `samples[]` (`LS<n>`, `face`, `defect`, `side`
+  accept/reject, `description`). Faces, defects per face and sample ids are
+  unique; molding-only (`sink_mark`, `flow_line`, `weld_line`,
+  `gate_vestige`, `ejector_mark`, `flash`), fdm-only (`layer_line`) and
+  machining/sheet-metal-only (`burr`) defects are rejected for other
+  processes; class A/B faces need defect limits, and each of their limits
+  exactly one accept and one reject sample.
+- `*.mech-appearance.json` (produced) — `mech_appearance` v1 projection of
+  `appearance` for production-engineering (faces and defects sorted, samples
+  in id order, `brief_sha256`).
+>>>>>>> origin/main
 - `*.ruggedness.sim.json` / `*.ruggedness.sim-request.json` (produced) —
   simulation-agent brief v1 with a `ruggedness` section (plate size and
   thickness from `enclosure.board`; `openings_min_mm` = the smaller side of
