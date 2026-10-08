@@ -276,6 +276,12 @@ def test_cli_author_renders_and_gates_rerun(
         assert len(entry["image_sha256"]) == 64
     report = json.loads((out_dir / "design-report.json").read_text(encoding="utf-8"))
     assert report["renders"]["status"] == "ok"
+    points = cast(list[dict[str, Any]], report["vision_points"])
+    assert [p["image_path"] for p in points] == [r["png_path"] for r in renders]
+    checklists = {p["checklist"] for p in points}
+    assert checklists <= {"dxf_outline", "assembly_render", "part_render"}
+    assert "assembly_render" in checklists and "part_render" in checklists
+    assert all(p["record_with"] == "mech_record_vision_review" for p in points)
     md = (out_dir / "design-report.md").read_text(encoding="utf-8")
     assert "Renders (advisory" in md
     # extra PNG/SVG files are not manifest entries: re-running gates passes

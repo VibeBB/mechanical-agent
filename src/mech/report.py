@@ -35,6 +35,34 @@ def build_report(
     return report
 
 
+VISION_RECORD_WITH = "mech_record_vision_review"
+
+
+def _vision_checklist(entry: dict[str, Any], design_name: str) -> str:
+    """Best-effort checklist slug for one renders entry."""
+    kind = entry.get("kind")
+    if kind == "dxf":
+        return "dxf_outline"
+    if kind == "views":
+        # `<name>.step` renders the assembly sheet; `<name>-<part>.step` a part.
+        source = Path(str(entry.get("source", ""))).name
+        return "assembly_render" if source == f"{design_name}.step" else "part_render"
+    return "intake_image"
+
+
+def vision_points(renders: list[dict[str, Any]], design_name: str) -> list[dict[str, str]]:
+    """Vision-review packet for the renders the report already lists."""
+    return [
+        {
+            "image_path": str(entry["png_path"]),
+            "checklist": _vision_checklist(entry, design_name),
+            "record_with": VISION_RECORD_WITH,
+        }
+        for entry in renders
+        if entry.get("png_path")
+    ]
+
+
 def write_report(
     brief: DesignBrief,
     design: GeneratedDesign,
@@ -50,6 +78,8 @@ def write_report(
         report["renders"] = (
             {"status": "ok", "files": renders} if isinstance(renders, list) else renders
         )
+        if isinstance(renders, list):
+            report["vision_points"] = vision_points(renders, brief.name)
     lints: dict[str, Any] = {}
     for lint_path in sorted(out_dir.glob("*.dxf_lint.json")):
         with contextlib.suppress(json.JSONDecodeError):
