@@ -103,3 +103,14 @@ Vision and impressions are advisory: they never override a deterministic
 gate verdict. Results do not have to be identical from run to run; the
 reasoning must be recorded every run. `mech_records_status` shows what is
 still owed.
+
+VRP v2 additions: impressions carry facets, claims quoting exact artifact
+tokens, and `upstream` for every sister impression you took in (record a
+`mech_record_read` first; check `mech_records_search` /
+`mech_records_digest` before raising a concern a sister already
+answered). For `*.views.png` and `*.section-*.png`, delegate a blind second
+review to `mech-blind-review`, then `mech_record_reconcile`; a split gets
+one tiebreak and otherwise stays `unknown`. Move insights with
+`mech_record_insight`. Receive a bard song once with
+`mech_record_song_receipt`; it never feeds a gate and never asks for
+another song.

@@ -29,7 +29,8 @@ and `mech-doctor` fail loud when the plugin root cannot resolve.
 
 | Hook | Matcher | Behavior |
 |---|---|---|
-| `protect-generated` | `file_editor\|apply_patch\|terminal` | exit 2 (block) + stderr reason on a protected write; exit 0 otherwise. Protected: `.step/.stp/.stl/.3mf/.dxf/.dxf_lint.json/.svg/.png/.ux-response.json` suffixes and `manifest.json`, `provenance.json`, `design-report.json`, `decisions.jsonl`, `impressions.jsonl`, `vision-reviews.jsonl`, `records-status.json` — path arguments only, file bodies never scanned; terminal writes detected via redirects/cp/mv/dd/sed -i/rm/tee/mkdir/chmod... |
+| `protect-generated` | `file_editor\|apply_patch\|terminal` | exit 2 (block) + stderr reason on a protected write; exit 0 otherwise. Protected: `.step/.stp/.stl/.3mf/.dxf/.dxf_lint.json/.svg/.png/.ux-response.json` suffixes and `manifest.json`, `provenance.json`, `design-report.json`, `decisions.jsonl`, `impressions.jsonl`, `vision-reviews.jsonl`, `reconciles.jsonl`, `insights.jsonl`, `reads.jsonl`, `song-receipts.jsonl`, `records-status.json`, `liaison/*.bard-song.json` — path arguments only, file bodies never scanned; terminal writes detected via redirects/cp/mv/dd/sed -i/rm/tee/mkdir/chmod... |
+| `blind-guard` | `file_editor\|apply_patch\|terminal\|grep\|glob` (`mech-blind-review` only) | exit 2 (deny) on reads of `observations/`, `*.advisory.json`, liaison answers and bard songs so the blind review stays independent (shared canonical hook) |
 | `safety-rail` | `terminal` (shared, hash-locked) | exit 2 (block) on dangerous shell commands; exit 0 otherwise |
 
 ## stop

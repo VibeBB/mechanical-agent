@@ -79,8 +79,9 @@ Each review judges geometric accuracy, ambiguity, whether the design
 intent comes across, usefulness to the maker or user, and the next step —
 not only legibility. `mech_render` and `mech_render_views` return the PNG
 inline (ImageContent) so a vision model sees the actual bytes; the
-`python -m mech review-record` CLI additionally mirrors the advisory
-record into `vision-reviews.jsonl`.
+`python -m mech review-record` CLI writes the advisory record only; the
+VRP v2 vision review (facets, claims, reviewer role) is recorded separately
+with `mech_record_vision_review`.
 
 ## Enforcement
 
@@ -90,3 +91,41 @@ decision, a fresh stage impression for changed artifacts (recorded sha256
 must equal current bytes), or a vision review for every vision event /
 viewed image — bounded by `max_stop_denials`. `records-status.json`
 records the last verdict; `mech_records_status` reports counts.
+
+## VRP v2 logs
+
+`observations/mech/` holds `decisions.jsonl`, `impressions.jsonl`,
+`vision-reviews.jsonl`, `reconciles.jsonl`, `insights.jsonl`, `reads.jsonl`
+and `song-receipts.jsonl`. Every line carries `schema_version` 2, `sequence`,
+`prev_event_id`, `writer` and `event_id` (the SHA-256 of the canonical
+record). The writer verifies the chain before appending and refuses a log
+that was edited, truncated or reordered; readers report such a log under
+`integrity_problems` and never resolve references into it. A log written
+entirely by VRP v1 is renamed to `<name>.v1.jsonl` on the first v2 write.
+
+Impressions carry facets (`observed`, `works`, `concerns`, maker/user
+`feelings`, `next_actions`), two or more claims quoting exact tokens from the
+bound artifacts, and a confidence; a near copy of an earlier impression, or
+a concern a sister already disputed, is refused. Taking in a sister artifact
+(a circuit board geometry, a UX CMF contract, a simulation response) needs a
+`mech_record_read` receipt and an `upstream` entry.
+
+## Blind review
+
+`*.views.png` views sheets and `*.section-*.png` cross-sections are
+dual-review images (`dual_review_globs` in `records-policy.json`). After the
+primary review, `mech-blind-review` reviews the same image without seeing it
+(`reviewer: "blind"`), and the caller records `mech_record_reconcile` over
+`[primary, blind]`. A split goes to one tiebreak round
+(`[primary, blind, tiebreak]`); a split after the tiebreak stays `unknown`
+and never becomes pass. DXF sheet renders keep a single review.
+
+## Insights, songs, digest
+
+`mech_record_insight` moves an insight through
+tried/adopted/rejected/deferred/superseded. mech only receives bard songs:
+`mech_record_song_receipt` records one receipt per
+`liaison/<id>.bard-song.json` (sha256-pinned, never a gate input, never a
+request for another song; the song file is protected from edits).
+`mech_records_digest` and `mech_records_search` read every plugin's
+impressions in the workspace.

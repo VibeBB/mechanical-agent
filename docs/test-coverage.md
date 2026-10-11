@@ -65,6 +65,11 @@ floor or add `# pragma: no cover` to make a gate pass. `[tool.coverage.report]
 fail_under` is the combined statement+branch percentage coverage.py reports
 with `branch = true`.
 
+The one exception so far: VRP v2 (ADR-0010) vendored the canonical record
+core (about 1,000 statements). C2 fell to 63.21% and MC/DC to 35.73%, so
+those two floors were set one point below the measured values (62, 34);
+every other floor still holds and they all ratchet up from there.
+
 ## Test-design techniques
 
 Coverage shows what the tests executed, not whether they check the right

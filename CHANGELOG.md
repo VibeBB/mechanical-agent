@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- VRP v2 records: hash-chained logs, grounded impressions, read receipts,
+  insight lifecycle, reconcile rounds, bard song receipts, digest and search,
+  and the `mech-blind-review` sub-agent for views sheets and cross-sections.
+
 ### Changed
 
 - MCP path arguments are confined to the workspace, Docker image inspect and

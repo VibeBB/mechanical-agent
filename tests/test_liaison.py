@@ -21,8 +21,46 @@ IMPRESSION = (
     "misread at this scale. A maker could fixture from the front view "
     "alone, and the anchor crosses sit exactly where the brief declared "
     "them. Next I would render the lid's own DXF and compare the snap "
-    "relief against the measured deflection."
+    "relief against the measured deflection. The out/a.step file opens with "
+    "ISO-10303-21 and closes its header with ENDSEC."
 )
+STEP = b"ISO-10303-21;\nHEADER;\nENDSEC;\n"
+
+
+def _impression_payload() -> dict[str, Any]:
+    return {
+        "stage": "design",
+        "artifacts": ["out"],
+        "impression": IMPRESSION,
+        "facets": {
+            "observed": ["the STEP file carries a header", "the header is closed"],
+            "works": ["every face projects without stray edges"],
+            "concerns": [
+                {
+                    "id": "c1",
+                    "text": "the lid recess is easy to misread at this scale",
+                    "severity": "info",
+                    "about": "self",
+                    "anchor": "ISO-10303-21",
+                }
+            ],
+            "feelings": {
+                "maker": "the front view alone is enough to fixture the part",
+                "user": "the lid reads as the brief promised",
+            },
+            "next_actions": ["render the lid DXF and compare the snap relief"],
+        },
+        "claims": [
+            {
+                "text": "the export is an ISO 10303-21 file",
+                "anchor": "ISO-10303-21",
+                "artifact": "out/a.step",
+            },
+            {"text": "the STEP header is closed", "anchor": "ENDSEC", "artifact": "out/a.step"},
+        ],
+        "confidence": "medium",
+        "unknowns": [],
+    }
 
 
 def _request(rid: str, **over: Any) -> dict[str, Any]:
@@ -182,7 +220,7 @@ def test_inbox_malformed_response(ws: Path) -> None:
 def _decision_event(ws: Path) -> str:
     artifact = ws / "out"
     artifact.mkdir(exist_ok=True)
-    (artifact / "a.step").write_bytes(b"s")
+    (artifact / "a.step").write_bytes(STEP)
     result = records.record_decision(
         {
             "id": "closure-type",
@@ -215,9 +253,7 @@ def test_ux_respond_done_full(ws: Path) -> None:
     ref = _input(ws, "spec.txt")
     _write_request(ws, "req-done", inputs=[ref])
     decision = _decision_event(ws)
-    impression = records.record_impression(
-        {"stage": "design", "artifacts": ["out"], "impression": IMPRESSION}
-    )["record"]["event_id"]
+    impression = records.record_impression(_impression_payload())["record"]["event_id"]
     (ws / "out" / "design-report.json").write_text(
         json.dumps(
             {
@@ -345,11 +381,9 @@ def test_ux_respond_done_stale_request(ws: Path) -> None:
     _write_request(ws, "req-stale", inputs=[ref])
     (ws / "spec.txt").write_bytes(b"changed")
     (ws / "out").mkdir()
-    (ws / "out" / "a.step").write_bytes(b"s")
+    (ws / "out" / "a.step").write_bytes(STEP)
     decision = _decision_event(ws)
-    impression = records.record_impression(
-        {"stage": "design", "artifacts": ["out"], "impression": IMPRESSION}
-    )["record"]["event_id"]
+    impression = records.record_impression(_impression_payload())["record"]["event_id"]
     with pytest.raises(ValueError, match="stale"):
         liaison.ux_respond(
             _respond_payload(

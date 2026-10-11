@@ -31,11 +31,16 @@ ARTIFACT_SUFFIXES = (
     ".png",
     ".ux-response.json",
     ".mech-appearance.json",
+    ".bard-song.json",
 )
 ARTIFACT_NAMES = (
     "decisions.jsonl",
     "impressions.jsonl",
     "vision-reviews.jsonl",
+    "reconciles.jsonl",
+    "insights.jsonl",
+    "reads.jsonl",
+    "song-receipts.jsonl",
     "records-status.json",
     "manifest.json",
     "provenance.json",
@@ -220,7 +225,7 @@ def main() -> int:
     if _is_artifact_write(payload):
         print(
             "generated artifacts (.step/.stl/.3mf/.dxf/.svg/.png,"
-            " design-report.json, VRP logs, *.ux-response.json) are"
+            " design-report.json, VRP logs, *.ux-response.json, liaison/*.bard-song.json) are"
             " projections of the brief or typed writers; regenerate them"
             " via mech_author / mech_render / mech_ux_respond or `python -m mech"
             " author|render|record|ux`, never edit them directly",

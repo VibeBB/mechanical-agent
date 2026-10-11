@@ -141,13 +141,16 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
 
 ## VRP records — `src/mech/records.py`
 
-Envelope on every line: `{schema_version: 1, kind, plugin: "mech",
-sequence, event_id (sha256 identity), recorded_at}`.
+Envelope on every line: `{schema_version: 2, kind, plugin: "mech",
+sequence, prev_event_id (hash chain), writer, event_id (sha256 of the
+canonical record), recorded_at}`. v2 adds `reconciles.jsonl`,
+`insights.jsonl`, `reads.jsonl` and `song-receipts.jsonl`; impressions carry
+facets, claims and confidence ([records-and-vision.md](records-and-vision.md)).
 
 - `decisions.jsonl` — `DecisionRecord` (see
   [records-and-vision.md](records-and-vision.md)).
 - `impressions.jsonl` — `StageImpression` `{stage, artifacts: [{path,
-  sha256}], impression}`.
+  sha256}], impression, facets, claims, confidence, unknowns, upstream}`.
 - `vision-reviews.jsonl` — `VisionReview` `{image_path?, image_sha256?,
   source_event_id?, model, checklist, findings[], impression}`.
 - `vision-tool-events.jsonl`, `image-observations.jsonl` — hook-written

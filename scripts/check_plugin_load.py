@@ -15,7 +15,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_DIR = REPO_ROOT / "plugins" / "mech"
 
-EXPECTED_AGENTS = {"mech-brief", "mech-design", "mech-review"}
+EXPECTED_AGENTS = {"mech-blind-review", "mech-brief", "mech-design", "mech-review"}
 EXPECTED_SKILLS = {
     "mech-brief",
     "mech-brief-rules",

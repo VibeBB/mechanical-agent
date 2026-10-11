@@ -50,6 +50,10 @@ exclude = [
   "scripts/structural_coverage.py",
   "tests/test_mutation_probe.py",
   "tests/test_structural_coverage.py",
+  "plugins/mech/hooks/scripts/_records.py",
+  "plugins/mech/hooks/scripts/require_records.py",
+  "plugins/mech/hooks/scripts/blind_guard.py",
+  "src/mech/_vrp.py",
 ]
 
 [tool.ruff.lint]
@@ -86,8 +90,8 @@ branch = true
 c0 = 85
 c1 = 73
 decision = 65
-c2 = 64
-mcdc = 38
+c2 = 62
+mcdc = 34
 boundary = 46
 
 

@@ -43,6 +43,12 @@ tools; all are `idempotentHint: true`, `openWorldHint: false`.
 | `mech_record_impression` | W | `StageImpressionInput` schema | record appended to `impressions.jsonl` | schema violation (impression not prose: <400 chars or <3 sentences), missing artifacts |
 | `mech_record_vision_review` | W | `VisionReviewInput` schema | record appended to `vision-reviews.jsonl` | schema violation, neither `image_path` nor `source_event_id` bound |
 | `mech_records_status` | R | — | counts per log + last Stop-hook verdict | never (malformed status file is reported in-payload) |
+| `mech_record_reconcile` | W | `ReconcileInput` schema | reconcile record over `[primary, blind]` or `[primary, blind, tiebreak]` | a round-2 split stays `unknown`; unknown review ids |
+| `mech_record_insight` | W | `InsightStatusInput` schema | insight lifecycle record | rejected needs revisits + new evidence |
+| `mech_record_song_receipt` | W | `SongReceiptInput` schema | one receipt per `liaison/<id>.bard-song.json` | second receipt, song addressed elsewhere; never a gate input |
+| `mech_record_read` | W | `ReadInput` schema | sha256-pinned read receipt for a sister artifact | missing artifact |
+| `mech_records_digest` | R | — | family-wide integrity, open concerns, disputes, unanswered reads | never |
+| `mech_records_search` | R | query, system, kind, stage, artifact, severity, open_only, limit | matching impressions | invalid filter |
 
 ## Liaison — SLP v2
 

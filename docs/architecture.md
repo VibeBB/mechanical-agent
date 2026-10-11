@@ -136,10 +136,13 @@ geometry yet).
   `render_author_outputs` (author-time DXF + views renders).
 - `advisory.py` — advisory envelope + typed visual-review records
   (`write_review_record`, `parse_visual_review`).
-- `records.py` — VRP v1 typed writers (`record_decision`,
-  `record_impression`, `record_vision_review`, `records_summary`,
+- `records.py` — VRP v2 typed writers (`record_decision`,
+  `record_impression`, `record_vision_review`, `record_reconcile`,
+  `record_insight`, `record_song_receipt`, `record_read`,
+  `records_digest`, `records_search`, `records_summary`,
   `tree_sha256`, `sha256_file`, `impression_is_prose`,
   `event_ids` — mech-local JSONL reader used by liaison/envelope).
+- `_vrp.py` — vendored VRP v2 core (mirror of the canonical `_records.py` hook).
 - `liaison.py` — SLP v2 (`UXRequestV2`/`UXResponseV2`, `ux_inbox`,
   `ux_respond`, `liaison_dir`).
 - `board_geometry.py` — strict mirror of circuit's board geometry,
