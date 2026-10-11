@@ -124,6 +124,12 @@ def _sim_response_path(brief: DesignBrief, brief_path: str) -> Path | None:
     return resolve_response(brief, Path(brief_path).parent)
 
 
+def _cmf_path(brief: DesignBrief, brief_path: str) -> Path | None:
+    from .ux_cmf import resolve_cmf
+
+    return resolve_cmf(brief, Path(brief_path).parent)
+
+
 def _cmd_board_import(args: argparse.Namespace) -> dict[str, Any]:
     from .board_geometry import load_geometry, sha256_file, suggest_board
 
@@ -162,6 +168,7 @@ def _cmd_author(args: argparse.Namespace) -> dict[str, Any]:
         out_dir,
         board_geometry_path=_geometry_path(brief, args.brief),
         sim_response_path=_sim_response_path(brief, args.brief),
+        cmf_path=_cmf_path(brief, args.brief),
     )
     renders: list[dict[str, Any]] | dict[str, Any] | None = None
     if not args.no_render:
@@ -232,6 +239,7 @@ def _cmd_gates(args: argparse.Namespace) -> dict[str, Any]:
         out_dir,
         board_geometry_path=_geometry_path(brief, args.brief),
         sim_response_path=_sim_response_path(brief, args.brief),
+        cmf_path=_cmf_path(brief, args.brief),
     )
     report_path = write_report(brief, design, gate_report, out_dir)
     result = gate_report.to_dict(brief)

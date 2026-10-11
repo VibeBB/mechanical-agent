@@ -757,6 +757,15 @@ def _manifest_checks(out_dir: Path) -> list[GateCheck]:
     return checks
 
 
+def _cmf_checks(brief: DesignBrief, cmf_path: Path | None) -> list[GateCheck]:
+    from .ux_cmf import cmf_problems
+
+    if brief.appearance is None or brief.appearance.cmf is None:
+        return []
+    status, detail = cmf_problems(brief, cmf_path)
+    return [GateCheck("appearance_cmf", brief.appearance.cmf.part, status, detail=detail)]
+
+
 def run_gates(
     brief: DesignBrief,
     design: GeneratedDesign,
@@ -766,6 +775,7 @@ def run_gates(
     board_geometry_path: Path | None = None,
     sim_response_path: Path | None = None,
     workspace: Path | None = None,
+    cmf_path: Path | None = None,
 ) -> GateReport:
     checks: list[GateCheck] = []
     checks += _kernel_checks(design)
@@ -773,6 +783,7 @@ def run_gates(
     checks += _board_envelope_checks(brief)
     checks += _board_geometry_checks(brief, board_geometry_path)
     checks += _sim_ruggedness_checks(brief, sim_response_path, workspace)
+    checks += _cmf_checks(brief, cmf_path)
     checks += _harness_anchor_checks(brief, design)
     checks += _opening_checks(brief, design)
     wall_checks = _wall_thickness_checks(brief, design)

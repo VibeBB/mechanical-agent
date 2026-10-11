@@ -615,6 +615,16 @@ class LimitSample(BaseModel):
     description: str = Field(min_length=1)
 
 
+class CmfSource(BaseModel):
+    """UX-creator contract whose CMF part this design realises, pinned by sha256."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    part: str = Field(min_length=1)
+
+
 class AppearanceSpec(BaseModel):
     """Cosmetic acceptance criteria and the limit samples production judges against."""
 
@@ -623,6 +633,7 @@ class AppearanceSpec(BaseModel):
     viewing: ViewingCondition
     surfaces: list[AppearanceSurface] = Field(min_length=1)
     samples: list[LimitSample] = Field(default_factory=list[LimitSample])
+    cmf: CmfSource | None = None
 
     @model_validator(mode="after")
     def validate_samples(self) -> AppearanceSpec:

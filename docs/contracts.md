@@ -97,7 +97,11 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   `gate_vestige`, `ejector_mark`, `flash`), fdm-only (`layer_line`) and
   machining/sheet-metal-only (`burr`) defects are rejected for other
   processes; class A/B faces need defect limits, and each of their limits
-  exactly one accept and one reject sample.
+  exactly one accept and one reject sample. Optional `cmf` (`path`,
+  `sha256`, `part`) pins the UX-creator contract and names the CMF part this
+  design realises; the `appearance_cmf` gate fails on a stale pin, a contract
+  without that part, or a part whose material name differs from the brief
+  `material`, and is `unknown` when the file is missing.
 - `*.mech-appearance.json` (produced) — `mech_appearance` v1 projection of
   `appearance` for production-engineering (faces and defects sorted, samples
   in id order, `brief_sha256`).

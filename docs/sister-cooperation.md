@@ -106,6 +106,15 @@ in a visual inspection's `limit_samples`, and its `appearance.limit_samples`
 gate fails until every pair is held by a visual attribute inspection. mech
 does not make the physical samples; it owns their criteria.
 
+## UX CMF → mech
+
+UX-creator owns the product's colors, materials and finishes (`cmf` in
+`{product}.ux.json`). A brief that realises one CMF part pins the contract in
+`appearance.cmf` (`path`, `sha256`, `part`). The `appearance_cmf` gate fails
+when the file changed after pinning, is not a ux-creator contract, has no such
+part, or the part's material name is not the brief `material`; it is
+`unknown` when the file is missing. mech never edits the UX contract.
+
 ## Envelope → wire
 
 `export-envelope` / `mech_export_envelope` emits `<name>.envelope.json`
