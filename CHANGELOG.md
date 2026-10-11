@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- SLP v2 responses carry `records_heads`, the chain head of every intact
+  VRP log at answer time; UX-creator checks it on receipt. `done` is
+  refused while any VRP log fails integrity.
 - `export-envelope` writes `keepouts` for wire-agent's `route_keepout`
   gate: the enclosure board volume (`board`) and the new brief
   `harness_keepouts[]` boxes, in the harness anchor frame.

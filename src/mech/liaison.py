@@ -39,7 +39,9 @@ from pydantic import (
     model_validator,
 )
 
+from . import _vrp
 from .records import RECORDS_DIR, event_ids, sha256_file, tree_sha256
+from .records import records_dir as _heads_records_dir
 from .workspace import workspace_path, workspace_root
 
 TARGET: str = "mech"
@@ -153,6 +155,7 @@ class UXResponseV2(_Strict):
     decision_refs: list[str] = Field(default_factory=list[str])
     impression_refs: list[str] = Field(default_factory=list[str])
     questions_for_user: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
+    records_heads: dict[str, str] = Field(default_factory=dict[str, str])
     responded_at: str = Field(min_length=1)
 
     @field_validator("responded_at")
@@ -398,6 +401,19 @@ def _design_report_verdicts(report_path: Path) -> tuple[list[str], list[dict[str
     return [str(report_path)], verdicts
 
 
+def _records_heads(root: Path) -> tuple[dict[str, str], list[str]]:
+    """Chain head per intact VRP log, plus the kinds whose chain is broken."""
+    heads: dict[str, str] = {}
+    broken: list[str] = []
+    for kind, filename in _vrp.LOG_FILES.items():
+        records, problems = _vrp.verify_log(_heads_records_dir(root) / filename, kind)
+        if problems:
+            broken.append(kind)
+        else:
+            heads[kind] = _vrp.chain_head(records)
+    return heads, broken
+
+
 def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     """Validate and write `liaison/<id>.ux-response.json` for a mech request."""
     base = (root or workspace_root()).resolve()
@@ -469,6 +485,10 @@ def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, A
             "reason needs at least 20 characters unless status is accepted/in_progress"
         )
 
+    heads, broken_logs = _records_heads(base)
+    if respond.status == "done" and broken_logs:
+        raise ValueError(f"refusing 'done': VRP logs fail integrity ({', '.join(broken_logs)})")
+
     response = UXResponseV2(
         request=request.id,
         responder=TARGET,
@@ -480,6 +500,7 @@ def ux_respond(payload: dict[str, Any], root: Path | None = None) -> dict[str, A
         decision_refs=list(respond.decision_refs),
         impression_refs=list(respond.impression_refs),
         questions_for_user=list(respond.questions_for_user),
+        records_heads=heads,
         responded_at=datetime.now(UTC).isoformat(),
     )
     out_path = directory / f"{request.id}.ux-response.json"
