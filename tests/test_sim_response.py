@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from mech._envelope import sidecar_path, write_envelope
 from mech.brief import DesignBrief
 from mech.gates import _sim_ruggedness_checks  # pyright: ignore[reportPrivateUsage]
 from mech.sim_request import write_sim_request
@@ -95,6 +96,7 @@ def _answer(
     }
     path = root / "sim" / "demo.ruggedness.sim-response.json"
     path.write_text(json.dumps(response), encoding="utf-8")
+    write_envelope(path, "sim", [], root)
     return path
 
 
@@ -112,6 +114,7 @@ def test_accepted_response_reports_sim_checks(
         ("response", "pass"),
         ("vibration.fn", "pass"),
         ("drop.peak_g", "pass"),
+        ("provenance", "pass"),
     ]
     assert findings[1][2] == 412.0
     assert "limit ≥ 200 Hz" in findings[1][3]
@@ -130,6 +133,7 @@ def test_rejected_response_keeps_the_failing_sim_check(
         "response": "pass",
         "vibration.fn": "pass",
         "drop.peak_g": "fail",
+        "provenance": "pass",
     }
 
 
@@ -301,3 +305,16 @@ def test_failing_sim_check_carries_margin_and_guidance(
     assert drop[1] == "fail"
     assert "margin -300" in drop[3]
     assert drop[3].endswith("fix: pulse_ms ≥ 1.2 (cushioning; peak ∝ 1/pulse)")
+
+
+def test_response_provenance_missing_or_foreign_is_not_a_pass(
+    tmp_path: Path, enclosure_brief_dict: dict[str, Any]
+) -> None:
+    brief = _brief(enclosure_brief_dict)
+    path = _answer(tmp_path, brief, PASSING)
+    sidecar = sidecar_path(path)
+    body = json.loads(sidecar.read_text(encoding="utf-8"))
+    sidecar.write_text(json.dumps(body | {"producer": "wire"}), encoding="utf-8")
+    assert _status(brief, path, tmp_path)["provenance"] == "fail"
+    sidecar.unlink()
+    assert _status(brief, path, tmp_path)["provenance"] == "unknown"
