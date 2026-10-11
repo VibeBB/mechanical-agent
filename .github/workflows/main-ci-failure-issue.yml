@@ -12,6 +12,7 @@ on:
       - "Dependency update check"
       - "Digest lock PR sweep"
       - "Locked image check"
+      - "Mutation probe"
       - "PR branch cleanup"
       - "Publish mech images"
       - "Release"
