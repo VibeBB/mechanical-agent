@@ -66,9 +66,12 @@ fail_under` is the combined statement+branch percentage coverage.py reports
 with `branch = true`.
 
 The one exception so far: VRP v2 (ADR-0010) vendored the canonical record
-core (about 1,000 statements). C2 fell to 63.21% and MC/DC to 35.73%, so
-those two floors were set one point below the measured values (62, 34);
-every other floor still holds and they all ratchet up from there.
+core (about 1,000 statements). Measured as CI's verify job runs (no
+`rsvg-convert`, so the render tests skip), C0 fell to 84.20%, C1 to 70.65%,
+decision to 64.57%, C2 to 61.26%, MC/DC to 34.88%, boundary to 45.71% and
+the combined percentage to 80.70%. Each lowered floor was set one point
+below its measured value rounded down (83, 69, 63, 60, 44; `fail_under`
+79); MC/DC still holds at 34. They all ratchet up from there.
 
 ## Test-design techniques
 

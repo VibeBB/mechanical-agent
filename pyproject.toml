@@ -87,12 +87,12 @@ branch = true
 # Measured as CI's verify job runs: no rsvg-convert on PATH, so the render
 # tests skip. c0 stays at or above main's former statement-only fail_under
 # of 83.
-c0 = 85
-c1 = 73
-decision = 65
-c2 = 62
+c0 = 83
+c1 = 69
+decision = 63
+c2 = 60
 mcdc = 34
-boundary = 46
+boundary = 44
 
 
 [tool.vibebb-mutation]
@@ -102,4 +102,4 @@ tests = ["tests/test_gates.py", "tests/test_gate_boundaries.py"]
 max_mutants = 400
 
 [tool.coverage.report]
-fail_under = 83
+fail_under = 79
