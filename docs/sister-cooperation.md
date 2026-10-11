@@ -54,6 +54,8 @@ derives `<design>/verdict` plus one `<design>/<check id>` entry per
 non-pass check from each `design_reports` file, sets `responded_at`
 (tz-aware UTC), and writes `liaison/<id>.ux-response.json`
 (deterministic, overwrite allowed).
+Refs resolve only against an intact VRP v2 chain: a log that fails
+`verify_log` (forged, edited or truncated lines) refuses every ref into it.
 
 Refusals (`ValueError` → CLI verdict fail / MCP isError):
 

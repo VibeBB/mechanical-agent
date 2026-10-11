@@ -493,3 +493,14 @@ def test_respond_questions_items_nonempty(ws: Path) -> None:
     _write_request(ws, "req-q")
     with pytest.raises(ValueError):
         liaison.ux_respond(_respond_payload("req-q", status="accepted", questions_for_user=[""]))
+
+
+def test_event_ids_refuse_a_broken_chain(ws: Path) -> None:
+    decision = _decision_event(ws)
+    log = records.records_dir(ws) / "decisions.jsonl"
+    assert records.event_ids(log) == {decision}
+    last = json.loads(log.read_text(encoding="utf-8").splitlines()[-1])
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(last | {"event_id": "f" * 64}) + "\n")
+    with pytest.raises(ValueError, match="fails integrity"):
+        records.event_ids(log)

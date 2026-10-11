@@ -23,7 +23,6 @@ from __future__ import annotations
 import fcntl
 import json
 import os
-import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -656,19 +655,9 @@ def records_search(payload: Mapping[str, Any], root: Path | None = None) -> dict
 
 
 def event_ids(log: Path) -> set[str]:
-    """event_id values in a VRP JSONL log; unreadable lines are skipped."""
-    ids: set[str] = set()
-    if not log.is_file():
-        return ids
-    for line in log.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            event: object = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(event, dict):
-            event_id = cast(dict[str, Any], event).get("event_id")
-            if isinstance(event_id, str) and re.fullmatch(r"[0-9a-f]{64}", event_id):
-                ids.add(event_id)
-    return ids
+    """Event ids from an intact VRP v2 log; a broken chain refuses every ref."""
+    kind = {name: kind for kind, name in _vrp.LOG_FILES.items()}[log.name]
+    records, problems = _vrp.verify_log(log, kind)
+    if problems:
+        raise ValueError(f"VRP {kind} log fails integrity: {problems[0]}")
+    return {str(record.get("event_id")) for record in records}
