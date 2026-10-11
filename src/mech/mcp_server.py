@@ -144,6 +144,15 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["brief", "out_dir"],
         "additionalProperties": False,
     },
+    "mech_board_envelope": {
+        "type": "object",
+        "properties": {
+            "brief": {"type": "object"},
+            "out_dir": {"type": "string"},
+        },
+        "required": ["brief", "out_dir"],
+        "additionalProperties": False,
+    },
     "mech_export_envelope": {
         "type": "object",
         "properties": {
@@ -291,6 +300,10 @@ _DESCRIPTIONS = {
     ),
     "mech_appearance": (
         "Emit cosmetic criteria and limit samples (*.mech-appearance.json) for prodeng."
+    ),
+    "mech_board_envelope": (
+        "Emit board height limits and connector openings (*.mech-board-envelope.json) "
+        "for circuit-agent."
     ),
     "mech_export_envelope": (
         "Emit the wire-agent EnvelopeSource contract (*.envelope.json) from brief harness_anchors."
@@ -597,6 +610,14 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             out_dir = _path_arg(arguments, "out_dir")
             reject_symlinks(out_dir)
             return _ok(write_appearance(brief, out_dir))
+        if name == "mech_board_envelope":
+            from .board_envelope import write_board_envelope
+            from .brief import DesignBrief
+
+            brief = DesignBrief.model_validate(arguments["brief"])
+            out_dir = _path_arg(arguments, "out_dir")
+            reject_symlinks(out_dir)
+            return _ok(write_board_envelope(brief, out_dir))
         if name == "mech_export_envelope":
             from .brief import DesignBrief
             from .envelope import write_envelope
@@ -748,6 +769,7 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_export_envelope": _anno("Export envelope contract", write=True),
     "mech_sim_request": _anno("Emit simulation ruggedness request", write=True),
     "mech_appearance": _anno("Emit appearance limit samples", write=True),
+    "mech_board_envelope": _anno("Emit board envelope for circuit", write=True),
     "mech_board_import": _anno("Board geometry import", write=False),
     "mech_dxf_lint": _anno("DXF lint", write=False),
     "mech_render": _anno("Render DXF to PNG", write=True),

@@ -12,6 +12,7 @@ Subcommands:
   export-envelope emit the wire-agent EnvelopeSource contract (ADR-0003)
   sim-request     emit a simulation-agent ruggedness brief + request (drop/vibration/IP)
   appearance      emit cosmetic criteria + limit samples (*.mech-appearance.json)
+  board-envelope  emit board height limits + connector openings for circuit-agent
   review-record   write a validated visual-review advisory JSON for an image
   record          append a VibeBB Record Protocol record (decision, impression,
                   vision-review) or print the records status
@@ -70,6 +71,15 @@ def _cmd_appearance(args: argparse.Namespace) -> dict[str, Any]:
         return write_appearance(load_brief(Path(args.brief)), Path(args.out_dir))
     except Exception as exc:
         return {"verdict": "fail", "stage": "appearance", "detail": str(exc)}
+
+
+def _cmd_board_envelope(args: argparse.Namespace) -> dict[str, Any]:
+    from .board_envelope import write_board_envelope
+
+    try:
+        return write_board_envelope(load_brief(Path(args.brief)), Path(args.out_dir))
+    except Exception as exc:
+        return {"verdict": "fail", "stage": "board-envelope", "detail": str(exc)}
 
 
 def _cmd_export_envelope(args: argparse.Namespace) -> dict[str, Any]:
@@ -456,6 +466,13 @@ def build_parser() -> argparse.ArgumentParser:
     appearance_p.add_argument("--brief", required=True)
     appearance_p.add_argument("--out-dir", required=True)
 
+    board_envelope_p = sub.add_parser(
+        "board-envelope",
+        help="emit board height limits and connector openings for circuit-agent",
+    )
+    board_envelope_p.add_argument("--brief", required=True)
+    board_envelope_p.add_argument("--out-dir", required=True)
+
     envelope_p = sub.add_parser(
         "export-envelope",
         help="emit the wire-agent envelope contract",
@@ -577,6 +594,7 @@ def main(argv: list[str] | None = None) -> int:
         "export-envelope": _cmd_export_envelope,
         "sim-request": _cmd_sim_request,
         "appearance": _cmd_appearance,
+        "board-envelope": _cmd_board_envelope,
         "intake": _cmd_intake,
         "author": _cmd_author,
         "export": _cmd_export,

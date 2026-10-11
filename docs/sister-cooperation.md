@@ -108,6 +108,20 @@ in a visual inspection's `limit_samples`, and its `appearance.limit_samples`
 gate fails until every pair is held by a visual attribute inspection. mech
 does not make the physical samples; it owns their criteria.
 
+## Board envelope → circuit
+
+`board-envelope` / `mech_board_envelope` projects the enclosure board cavity
+into the circuit board frame (`board_center_y_up_mm`) as
+`<name>.mech-board-envelope.json` (`artifact_kind: mech_board_envelope`, the
+brief sha256). It carries the board size, thickness and mount holes the
+standoffs expect; `max_height_top_mm` (inner lid face minus the board top
+surface); `max_height_bottom_mm` (the standoff height); and every side-face
+opening as `along_mm` (the face-local span `board_geometry` compares with a
+connector courtyard) plus `z_mm` (measured from the board top surface).
+circuit-agent pins the file by sha256 in its brief and gates part heights
+and edge connectors against it (`circuit.enclosure`), so a part that would
+not fit fails in circuit before mech re-imports the board.
+
 ## UX CMF → mech
 
 UX-creator owns the product's colors, materials and finishes (`cmf` in
@@ -135,3 +149,24 @@ decision_refs? (validated against decisions.jsonl)}`; the tool returns
 Artifacts (STEP/STL/3MF/DXF + `design-report.json`) feed sim and
 production-engineering; briefs and intake feed document. Vision reviews
 and decisions are readable by any sister through `observations/mech/`.
+
+## Change control (ECR/ECO)
+
+A change to a file that another agent pins by sha256 goes through
+UX-creator's change records, never a silent re-pin. There is no human
+approval step.
+
+1. Raise `<id>.ecr.json` with the reason, the proposal and each file to
+   change with its current sha256.
+2. After regenerating, write `<id>.eco.json` with each file's `before` and
+   `after` sha256, the gate report that passed it (verdict `pass`, citing
+   the `after` sha256) and the AI review findings with their dispositions.
+   A `blocker` closes only as `fixed`, and the author cannot review its own
+   change.
+3. `ux change <eco>` (MCP `ux_change_check`) finds every consumer that pins
+   a changed file. It fails if one still pins the old sha256, or re-pinned
+   without being listed in the ECO.
+
+AI review findings can only stop a change. This plugin's deterministic
+gates and the change check decide. The record formats are in
+[UX-creator-agent `docs/sister-cooperation.md`](https://github.com/VibeBB/UX-creator-agent/blob/main/docs/sister-cooperation.md#change-control-ecreco-and-design-review).

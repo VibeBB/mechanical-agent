@@ -108,6 +108,10 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
 - `*.mech-appearance.json` (produced) — `mech_appearance` v1 projection of
   `appearance` for production-engineering (faces and defects sorted, samples
   in id order, `brief_sha256`).
+- `*.mech-board-envelope.json` (produced) — `mech_board_envelope` v1
+  projection of `enclosure.board` and the side-face openings into the
+  circuit board frame for circuit-agent (`brief_sha256`, part height limits
+  above and below the board, openings in id order).
 - `*.ruggedness.sim.json` / `*.ruggedness.sim-request.json` (produced) —
   simulation-agent brief v1 with a `ruggedness` section (plate size and
   thickness from `enclosure.board`; `openings_min_mm` = the smaller side of
