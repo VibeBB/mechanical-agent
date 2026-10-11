@@ -70,17 +70,25 @@ def board_envelope_payload(brief: DesignBrief) -> dict[str, Any]:
     }
 
 
-def write_board_envelope(brief: DesignBrief, out_dir: Path) -> dict[str, Any]:
+def write_board_envelope(
+    brief: DesignBrief, out_dir: Path, brief_path: Path | None = None
+) -> dict[str, Any]:
     """Write ``<name>.mech-board-envelope.json`` and return its path and sha256."""
     payload = board_envelope_payload(brief)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{brief.name}.mech-board-envelope.json"
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     path.write_text(text, encoding="utf-8")
+    from . import _envelope
+    from .workspace import workspace_root
+
+    sources = [brief_path] if brief_path is not None else []
+    provenance = _envelope.write_envelope(path, "mech", sources, workspace_root())
     return {
         "verdict": "pass",
         "design": brief.name,
         "path": str(path),
         "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "decision_refs": provenance["decision_refs"],
         "openings": [opening["id"] for opening in payload["openings"]],
     }

@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Interchange envelope v3: `export-envelope`, `board-envelope` and
+  `appearance` write a `<artifact>.provenance.json` sidecar (artifact
+  sha256, brief/design-report sources, citing decision refs). The
+  `import_provenance` check on a pinned circuit board geometry verifies
+  circuit's sidecar against the pin, its sources and circuit's intact
+  decision log (`unknown` without a sidecar).
 - SLP v2 responses carry `records_heads`, the chain head of every intact
   VRP log at answer time; UX-creator checks it on receipt. `done` is
   refused while any VRP log fails integrity.

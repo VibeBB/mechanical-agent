@@ -49,18 +49,26 @@ def appearance_payload(brief: DesignBrief) -> dict[str, Any]:
     }
 
 
-def write_appearance(brief: DesignBrief, out_dir: Path) -> dict[str, Any]:
+def write_appearance(
+    brief: DesignBrief, out_dir: Path, brief_path: Path | None = None
+) -> dict[str, Any]:
     """Write ``<name>.mech-appearance.json`` and return its path and sha256."""
     payload = appearance_payload(brief)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{brief.name}.mech-appearance.json"
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     path.write_text(text, encoding="utf-8")
+    from . import _envelope
+    from .workspace import workspace_root
+
+    sources = [brief_path] if brief_path is not None else []
+    provenance = _envelope.write_envelope(path, "mech", sources, workspace_root())
     return {
         "verdict": "pass",
         "design": brief.name,
         "path": str(path),
         "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "decision_refs": provenance["decision_refs"],
         "surfaces": [surface["face"] for surface in payload["surfaces"]],
         "samples": [sample["id"] for sample in payload["samples"]],
     }

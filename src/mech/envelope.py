@@ -143,9 +143,13 @@ def write_envelope(
             ]
         except Exception as exc:
             raise ValueError(f"cannot read assembly STEP {assembly_step}: {exc}") from exc
+    from . import _envelope
+    from .workspace import workspace_root
+
+    sources = [path for path in (brief_path, report_path) if path is not None]
+    provenance.update(_envelope.write_envelope(out_path, "mech", sources, workspace_root()))
     refs = _validate_decision_refs(list(decision_refs or []), brief_path)
-    if refs:
-        provenance["decision_refs"] = refs
+    provenance["decision_refs"] = sorted({*provenance["decision_refs"], *refs})
     sidecar = out_path.with_suffix(".provenance.json")
     sidecar.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return provenance
