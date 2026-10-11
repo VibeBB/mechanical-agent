@@ -94,6 +94,7 @@ current brief by sha256, a stale or tampered answer fails, a missing or
 `needs_info` answer is `unknown`, and each simulation check (with its
 measured value and limit) appears in mech's gate report with simulation's
 own verdict.
+The response also needs simulation-agent's envelope v3 sidecar (`*.sim-response.provenance.json`): a tampered or foreign sidecar or a broken sim decision log adds a failing `provenance` finding, and a missing sidecar adds an `unknown` one.
 
 ## Appearance limit samples → production-engineering
 

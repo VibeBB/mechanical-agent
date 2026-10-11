@@ -200,7 +200,14 @@ def ruggedness_findings(
     findings = _report_findings(report, response)
     if findings[0][0] == "report":
         return findings
-    return [("response", "pass", None, f"{response.request_id} {response.status}"), *findings]
+    from ._envelope import check_envelope
+
+    provenance, provenance_detail = check_envelope(response_path, "sim", root)
+    return [
+        ("response", "pass", None, f"{response.request_id} {response.status}"),
+        *findings,
+        ("provenance", provenance, None, provenance_detail),
+    ]
 
 
 __all__ = ["SimResponse", "expected_request", "resolve_response", "ruggedness_findings"]
