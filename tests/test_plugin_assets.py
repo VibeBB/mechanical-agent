@@ -57,6 +57,7 @@ def test_brief_rule_is_path_triggered():
 def test_agent_definitions():
     agents = sorted((PLUGIN_ROOT / "agents").glob("*.md"))
     assert {a.stem for a in agents} == {
+        "mech-blind-review",
         "mech-brief",
         "mech-design",
         "mech-review",

@@ -1,6 +1,6 @@
 # Agents
 
-Three task sub-agents in `plugins/mech/agents/`, invoked only via the SDK
+Four task sub-agents in `plugins/mech/agents/`, invoked only via the SDK
 `task` tool (`TaskToolSet`). Each declares its required hooks because
 plugin hooks do not propagate to sub-agents.
 
@@ -28,7 +28,19 @@ decision per non-trivial choice and the author stage impression.
 
 L2 advisory pass. Renders every `.dxf` and every `.step`, inspects each
 image, and files `review-visual-<slug>.advisory.json` via the
-`review-record` CLI (which also mirrors into `vision-reviews.jsonl`) —
+`review-record` CLI (advisory only; the VRP v2 `vision_review` is recorded
+separately with `mech_record_vision_review`) —
 baseline fidelity, manufacturing completeness, design intent. Also checks
 declared dimensions against the report's measured values and sanity-checks
 fits/stackups/mechanism features. Never promotes findings to a verdict.
+
+## mech-blind-review
+
+Independent second vision review of one `*.views.png` views sheet or
+`*.section-*.png` cross-section (`reviewer: "blind"` in round 1,
+`"tiebreak"` in round 2). The `blind-guard` hook denies reads of
+`observations/`, advisories, liaison answers and bard songs, so the first
+review cannot anchor it. It writes two or more exact-token claims with
+lookback checks through `mech_record_vision_review`, replies with the event
+id only, and has no verdict authority; the caller reconciles, and a split
+after the tiebreak stays `unknown`. It declares no `task_tracker`.

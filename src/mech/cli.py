@@ -280,43 +280,26 @@ def _cmd_review_record(args: argparse.Namespace) -> dict[str, Any]:
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {"verdict": "fail", "stage": "review-record", "detail": str(exc)}
-    return {"verdict": "pass", "record": str(path), "vision_log": _log_vision_review(path)}
-
-
-def _log_vision_review(advisory_path: Path) -> str:
-    """Mirror the advisory into the VRP vision-review log when the image is in the workspace."""
-    from .records import record_vision_review
-
-    detail = json.loads(advisory_path.read_text(encoding="utf-8"))["detail"]
-    try:
-        logged = record_vision_review(
-            {
-                "image_path": detail["image_path"],
-                "model": detail["model"],
-                "checklist": detail["checklist"].replace("_", "-"),
-                "findings": [
-                    {"category": f["category"], "severity": f["severity"], "note": f["note"]}
-                    for f in detail["findings"]
-                ],
-                "impression": detail["impression"],
-            }
-        )
-    except ValueError as exc:
-        return f"skipped: {exc}"
-    return str(logged["path"])
+    return {"verdict": "pass", "record": str(path)}
 
 
 def _cmd_record(args: argparse.Namespace) -> dict[str, Any]:
     from pydantic import ValidationError
 
-    from .records import RECORDERS, records_summary
+    from .records import RECORDERS, records_digest, records_search, records_summary
 
     if args.kind == "status":
         return records_summary()
+    if args.kind == "digest":
+        return records_digest()
+    if args.kind == "search" and not args.json:
+        return records_search({})
     try:
         raw: Any = json.loads(Path(args.json).read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ValueError("record JSON must be an object")
+        if args.kind == "search":
+            return records_search(cast(dict[str, Any], raw))
         return RECORDERS[args.kind](cast(dict[str, Any], raw))
     except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
         return {"verdict": "fail", "stage": "record", "detail": str(exc)}
@@ -551,8 +534,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON file: list of {category, severity, note, bbox?}",
     )
 
-    record_p = sub.add_parser("record", help="append a VibeBB Record Protocol record")
-    record_p.add_argument("kind", choices=["decision", "impression", "vision-review", "status"])
+    record_p = sub.add_parser("record", help="append a VibeBB Record Protocol v2 record")
+    record_p.add_argument(
+        "kind",
+        choices=[
+            "decision",
+            "impression",
+            "vision-review",
+            "reconcile",
+            "insight",
+            "song-receipt",
+            "read",
+            "status",
+            "digest",
+            "search",
+        ],
+    )
     record_p.add_argument("--json", default=None, help="JSON object file with the record fields")
 
     ux_p = sub.add_parser("ux", help="UX-creator liaison inbox / respond (SLP v2)")
@@ -567,7 +564,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "record" and args.kind != "status" and not args.json:
+    if (
+        args.command == "record"
+        and args.kind not in {"status", "digest", "search"}
+        and not args.json
+    ):
         parser.error("record decision|impression|vision-review requires --json")
     if args.command == "doctor":
         return _emit_doctor(args)

@@ -17,7 +17,8 @@ problem, evidence, done / not-done and why.
   `records-policy.json`, protect-generated covers the log names.
 - **Advisory impression floor unified.** `advisory.py` now uses
   `records.impression_is_prose` (400 chars / 3 sentences), matching the
-  VRP rule; `review-record` mirrors into `vision-reviews.jsonl`.
+  VRP rule; `review-record` writes the advisory only (VRP v2 reviews are
+  recorded separately).
 - **SLP v2 liaison.** `src/mech/liaison.py` (`UXRequestV2`/`UXResponseV2`
   strict mirrors), `mech_ux_inbox`/`mech_ux_respond`, `ux` CLI,
   `report_ux_inbox.py` session hook, `*.ux-response.json` write-protected.

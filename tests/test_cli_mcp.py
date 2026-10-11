@@ -216,6 +216,10 @@ def test_mcp_tool_annotations():
         "mech_record_decision",
         "mech_record_impression",
         "mech_record_vision_review",
+        "mech_record_reconcile",
+        "mech_record_insight",
+        "mech_record_song_receipt",
+        "mech_record_read",
         "mech_ux_respond",
     }
     tools = tool_specs()
@@ -239,6 +243,12 @@ def test_mcp_tool_annotations():
         "mech_record_impression",
         "mech_record_vision_review",
         "mech_records_status",
+        "mech_record_reconcile",
+        "mech_record_insight",
+        "mech_record_song_receipt",
+        "mech_record_read",
+        "mech_records_digest",
+        "mech_records_search",
         "mech_ux_inbox",
         "mech_ux_respond",
     }

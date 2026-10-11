@@ -12,6 +12,7 @@ import asyncio
 import base64
 import dataclasses
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -25,11 +26,21 @@ from . import __version__
 from .doctor import run_doctor
 from .records import (
     DecisionInput,
+    InsightStatusInput,
+    ReadInput,
+    ReconcileInput,
+    SongReceiptInput,
     StageImpressionInput,
     VisionReviewInput,
     record_decision,
     record_impression,
+    record_insight,
+    record_read,
+    record_reconcile,
+    record_song_receipt,
     record_vision_review,
+    records_digest,
+    records_search,
     records_summary,
 )
 from .standards import (
@@ -200,6 +211,29 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {},
         "additionalProperties": False,
     },
+    "mech_record_reconcile": ReconcileInput.model_json_schema(),
+    "mech_record_insight": InsightStatusInput.model_json_schema(),
+    "mech_record_song_receipt": SongReceiptInput.model_json_schema(),
+    "mech_record_read": ReadInput.model_json_schema(),
+    "mech_records_digest": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    "mech_records_search": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "system": {"type": "string"},
+            "kind": {"type": "string", "enum": ["stage_impression", "vision_review"]},
+            "stage": {"type": "string"},
+            "artifact": {"type": "string"},
+            "severity": {"type": "string", "enum": ["info", "warning", "error"]},
+            "open_only": {"type": "boolean"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+        },
+        "additionalProperties": False,
+    },
     "mech_ux_inbox": {
         "type": "object",
         "properties": {},
@@ -300,6 +334,29 @@ _DESCRIPTIONS = {
     "mech_records_status": (
         "Counts of decision / impression / vision-review records and the last Stop-hook "
         "verdict listing records this session still owes."
+    ),
+    "mech_record_reconcile": (
+        "Compare independent reviews of one image: [primary, blind] (round 1) or "
+        "[primary, blind, tiebreak] (round 2, the last); a round-2 split stays unknown."
+    ),
+    "mech_record_insight": (
+        "Move an impression insight through tried/adopted/rejected/deferred/superseded; "
+        "a rejected insight returns only with revisits and new evidence."
+    ),
+    "mech_record_song_receipt": (
+        "Receive a bard song addressed to mech; a receipt never feeds a gate and never "
+        "asks bard for another song."
+    ),
+    "mech_record_read": (
+        "Record that a sister artifact was taken in; resolves the impressions bound to it."
+    ),
+    "mech_records_digest": (
+        "Family-wide impression digest: integrity per plugin, open concerns, disputes, "
+        "unanswered reads, insights, split reviews and undelivered songs."
+    ),
+    "mech_records_search": (
+        "Search every plugin's impressions by text, plugin, stage, artifact, severity or "
+        "open concerns; logs with broken integrity are listed separately."
     ),
     "mech_ux_inbox": (
         "List UX-creator liaison requests targeting mech (SLP v2): per-request state "
@@ -448,6 +505,16 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     return result
 
 
+_VRP_TOOLS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "mech_record_reconcile": record_reconcile,
+    "mech_record_insight": record_insight,
+    "mech_record_song_receipt": record_song_receipt,
+    "mech_record_read": record_read,
+    "mech_records_digest": lambda _arguments: records_digest(),
+    "mech_records_search": records_search,
+}
+
+
 def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
     try:
         if name == "mech_doctor":
@@ -460,6 +527,8 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             return _ok(record_vision_review(arguments))
         if name == "mech_records_status":
             return _ok(records_summary())
+        if name in _VRP_TOOLS:
+            return _ok(_VRP_TOOLS[name](arguments))
         if name == "mech_ux_inbox":
             from .liaison import ux_inbox
 
@@ -688,6 +757,12 @@ _ANNOTATIONS: dict[str, types.ToolAnnotations] = {
     "mech_record_impression": _anno("Record stage impression", write=True),
     "mech_record_vision_review": _anno("Record vision review", write=True),
     "mech_records_status": _anno("Records status", write=False),
+    "mech_record_reconcile": _anno("Reconcile vision reviews", write=True),
+    "mech_record_insight": _anno("Record insight status", write=True),
+    "mech_record_song_receipt": _anno("Record bard song receipt", write=True),
+    "mech_record_read": _anno("Record read receipt", write=True),
+    "mech_records_digest": _anno("Records digest", write=False),
+    "mech_records_search": _anno("Search records", write=False),
     "mech_ux_inbox": _anno("Liaison inbox", write=False),
     "mech_ux_respond": _anno("Answer liaison request", write=True),
 }
