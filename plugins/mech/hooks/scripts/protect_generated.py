@@ -31,6 +31,7 @@ ARTIFACT_SUFFIXES = (
     ".png",
     ".ux-response.json",
     ".mech-appearance.json",
+    ".mech-board-envelope.json",
     ".bard-song.json",
 )
 ARTIFACT_NAMES = (
