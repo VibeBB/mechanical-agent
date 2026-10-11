@@ -68,7 +68,7 @@ def _cmd_appearance(args: argparse.Namespace) -> dict[str, Any]:
     from .appearance import write_appearance
 
     try:
-        return write_appearance(load_brief(Path(args.brief)), Path(args.out_dir))
+        return write_appearance(load_brief(Path(args.brief)), Path(args.out_dir), Path(args.brief))
     except Exception as exc:
         return {"verdict": "fail", "stage": "appearance", "detail": str(exc)}
 
@@ -77,7 +77,9 @@ def _cmd_board_envelope(args: argparse.Namespace) -> dict[str, Any]:
     from .board_envelope import write_board_envelope
 
     try:
-        return write_board_envelope(load_brief(Path(args.brief)), Path(args.out_dir))
+        return write_board_envelope(
+            load_brief(Path(args.brief)), Path(args.out_dir), Path(args.brief)
+        )
     except Exception as exc:
         return {"verdict": "fail", "stage": "board-envelope", "detail": str(exc)}
 

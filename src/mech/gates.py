@@ -364,6 +364,11 @@ def _board_geometry_checks(brief: DesignBrief, geometry_path: Path | None) -> li
             )
         ]
     checks = [GateCheck("board_geometry", "source", "pass", detail=geometry.pcb.sha256)]
+    from ._envelope import check_envelope
+    from .workspace import workspace_root
+
+    status, detail = check_envelope(geometry_path, "circuit", workspace_root(), source.sha256)
+    checks.append(GateCheck("import_provenance", "board_geometry", status, detail=detail))
     for subject, declared, measured in (
         ("width", board.width_mm, geometry.width_mm),
         ("depth", board.depth_mm, geometry.depth_mm),

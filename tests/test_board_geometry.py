@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from mech import _envelope
 from mech.board_geometry import suggest_board
 from mech.brief import BoardSpec, DesignBrief
 from mech.cli import main
@@ -58,6 +59,7 @@ def _setup(
 ) -> tuple[DesignBrief, Path]:
     path = tmp_path / "demo.board-geometry.json"
     path.write_text(json.dumps(geometry), encoding="utf-8")
+    _envelope.write_envelope(path, "circuit", [], tmp_path)
     sha = hashlib.sha256(path.read_bytes()).hexdigest()
     data = copy.deepcopy(brief_dict)
     data["enclosure"]["board"]["source"] = {"path": path.name, "sha256": sha}
@@ -194,3 +196,15 @@ def test_cli_board_import(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     path.write_text("{}", encoding="utf-8")
     assert main(["board-import", "--geometry", str(path)]) == 1
     assert json.loads(capsys.readouterr().out)["verdict"] == "fail"
+
+
+def test_board_geometry_provenance_fails_closed(
+    tmp_path: Path, enclosure_brief_dict: dict[str, Any]
+) -> None:
+    brief, path = _setup(tmp_path, enclosure_brief_dict, _geometry())
+    side = _envelope.sidecar_path(path)
+    body = json.loads(side.read_text(encoding="utf-8"))
+    side.write_text(json.dumps(body | {"producer": "mech"}), encoding="utf-8")
+    assert _status(_board_geometry_checks(brief, path))["board_geometry"] == "fail"
+    side.unlink()
+    assert _status(_board_geometry_checks(brief, path))["board_geometry"] == "unknown"

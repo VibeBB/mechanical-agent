@@ -77,6 +77,11 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   within 0.05 mm, and for every edge connector an opening on that face
   spanning its courtyard (less the 0.25 mm IPC excess) and overlapping its
   z range above (top) or below (bottom) the board.
+  Once the source passes, `import_provenance` (subject `board_geometry`)
+  checks circuit's envelope v3 sidecar beside the pinned file: `fail` when
+  it is malformed, describes other bytes, a source changed or a
+  `decision_refs` id is not in circuit's intact decision log; `unknown`
+  when the sidecar, a source or the log is missing.
 
 - `enclosure.ruggedness` (`RuggednessSpec`, authored) — `board_material`
   (`youngs_mpa`, `poisson`, `density_kg_m3`, `component_mass_g`; required
@@ -140,9 +145,16 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   floor to board top + `keepout_height_mm`) plus the brief
   `harness_keepouts`, in the anchor frame. wire's `route_keepout` gate
   fails a route whose anchor polyline enters one.
-- `*.envelope.provenance.json` — `{schema_version: 1, system: "mech",
-  envelope_sha256, brief_path?, brief_sha256?, design_report_sha256?,
-  decision_refs?, anchor_frame: "assembly-bbox-min-corner"?,
+- Interchange envelope v3 (`src/mech/_envelope.py`, shared with the
+  family): `*.envelope.json`, `*.mech-board-envelope.json` and
+  `*.mech-appearance.json` each get a `<artifact>.provenance.json` sidecar
+  with `envelope_version: 3`, `producer: "mech"`, `artifact{name, sha256}`,
+  `sources[{path, sha256}]` (the brief and, for the envelope, the design
+  report) and `decision_refs` (mech decisions whose evidence cites a source
+  at its current sha256, plus validated `--decision-ref` ids). A broken
+  decision chain refuses the export. Consumers check it against their pin.
+- `*.envelope.provenance.json` — v3 fields above plus `{schema_version: 1, system: "mech",
+  envelope_sha256, brief_path?, brief_sha256?, design_report_sha256?, anchor_frame: "assembly-bbox-min-corner"?,
   step_frame_offset_mm: [x,y,z]?}` — the frame fields are present when
   the assembly STEP (`<brief name>.step` beside the envelope, written by
   author/export) could be read: `step_frame_offset_mm` is the assembly
