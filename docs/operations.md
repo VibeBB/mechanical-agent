@@ -382,7 +382,7 @@ been scanned because earlier publishes aborted at the tools gate) are
 upstream-borne and waived per-ID in `.trivyignore` with
 `exp:2027-01-03`: SDK `.venv` packages (pypdf, urllib3, virtualenv,
 wheel, setuptools, msgpack, jaraco.context), nodejs_wheel vendored
-node_modules, bundled Go binaries (rootlesskit, docker-buildx), and
+node_modules, bundled Go binaries (rootlesskit, gh, docker-buildx, docker-compose), and
 upstream Dockerfile copies (DS-0029). They clear on the next
 openhands-sdk bump — tracked in `scripts/dependency_update_deferrals.json`.
 
