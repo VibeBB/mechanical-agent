@@ -29,7 +29,7 @@ def _with_anchors(brief_dict: dict[str, Any]) -> dict[str, Any]:
 
 def _assert_envelope_shape(payload: dict[str, Any]) -> None:
     """Structural mirror of wire's EnvelopeSource (schema_version 1)."""
-    assert set(payload) == {"schema_version", "system", "anchors"}
+    assert set(payload) <= {"schema_version", "system", "anchors", "keepouts"}
     assert payload["schema_version"] == 1
     assert payload["system"] == "mech"
     assert payload["anchors"], "envelope needs at least one anchor"
@@ -158,3 +158,50 @@ def test_envelope_decision_refs_validated(
     brief = DesignBrief.model_validate(_with_anchors(enclosure_brief_dict))
     with pytest.raises(ValueError, match="decision_ref"):
         write_envelope(brief, tmp_path / "x.envelope.json", decision_refs=["0" * 64])
+
+
+def test_envelope_keepouts_board_and_declared(enclosure_brief_dict: dict[str, Any]) -> None:
+    data = _with_anchors(enclosure_brief_dict)
+    data["harness_keepouts"] = [
+        {"name": "fan", "min_mm": [10.0, 10.0, 5.0], "max_mm": [40.0, 40.0, 30.0]}
+    ]
+    brief = DesignBrief.model_validate(data)
+    keepouts = cast(list[dict[str, Any]], envelope_source(brief)["keepouts"])
+    names = [box["name"] for box in keepouts]
+    assert names[-1] == "fan"
+    spec = brief.enclosure
+    assert spec is not None
+    if spec.board is not None:
+        board = keepouts[0]
+        assert board["name"] == "board"
+        assert board["min_mm"][0] == pytest.approx((spec.width_mm - spec.board.width_mm) / 2)
+        assert board["min_mm"][2] == pytest.approx(spec.floor_mm)
+        assert board["max_mm"][2] == pytest.approx(
+            spec.floor_mm
+            + spec.standoff_height_mm
+            + spec.board.thickness_mm
+            + spec.board.keepout_height_mm
+        )
+    else:
+        assert names == ["fan"]
+
+
+@pytest.mark.parametrize(
+    "keepouts",
+    [
+        [{"name": "flat", "min_mm": [0.0, 0.0, 5.0], "max_mm": [1.0, 1.0, 5.0]}],
+        [{"name": "board", "min_mm": [0.0, 0.0, 0.0], "max_mm": [1.0, 1.0, 1.0]}],
+        [
+            {"name": "k", "min_mm": [0.0, 0.0, 0.0], "max_mm": [1.0, 1.0, 1.0]},
+            {"name": "k", "min_mm": [0.0, 0.0, 0.0], "max_mm": [1.0, 1.0, 1.0]},
+        ],
+    ],
+    ids=["zero-extent", "reserved-name", "duplicate"],
+)
+def test_malformed_keepouts_rejected(
+    enclosure_brief_dict: dict[str, Any], keepouts: list[dict[str, Any]]
+) -> None:
+    data = _with_anchors(enclosure_brief_dict)
+    data["harness_keepouts"] = keepouts
+    with pytest.raises(ValueError):
+        DesignBrief.model_validate(data)

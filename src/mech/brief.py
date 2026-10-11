@@ -511,6 +511,27 @@ class HarnessAnchor(BaseModel):
     )
 
 
+class HarnessKeepout(BaseModel):
+    """An axis-aligned volume the wire harness must not route through.
+
+    `min_mm`/`max_mm` share the `HarnessAnchor` frame (assembly bounding-box
+    minimum corner). Exported to wire-agent in the envelope `keepouts`; the
+    enclosure board volume is added automatically as `board`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
+    min_mm: tuple[float, float, float]
+    max_mm: tuple[float, float, float]
+
+    @model_validator(mode="after")
+    def validate_extent(self) -> HarnessKeepout:
+        if any(lo >= hi for lo, hi in zip(self.min_mm, self.max_mm, strict=True)):
+            raise ValueError(f"keep-out {self.name}: min_mm must be below max_mm on every axis")
+        return self
+
+
 DefectKind = Literal[
     "scratch",
     "dent",
@@ -687,6 +708,7 @@ class DesignBrief(BaseModel):
     fits: list[FitDeclaration] = Field(default_factory=list[FitDeclaration])
     stackups: list[StackupChain] = Field(default_factory=list[StackupChain])
     harness_anchors: list[HarnessAnchor] = Field(default_factory=list[HarnessAnchor])
+    harness_keepouts: list[HarnessKeepout] = Field(default_factory=list[HarnessKeepout])
     drawing: DrawingInfo = Field(default_factory=DrawingInfo)
     appearance: AppearanceSpec | None = None
 
@@ -718,6 +740,9 @@ class DesignBrief(BaseModel):
         anchor_names = [anchor.name for anchor in self.harness_anchors]
         if len(set(anchor_names)) != len(anchor_names):
             raise ValueError("harness anchor names must be unique")
+        keepout_names = [keepout.name for keepout in self.harness_keepouts]
+        if len(set(keepout_names)) != len(keepout_names) or "board" in keepout_names:
+            raise ValueError("harness keep-out names must be unique and not 'board'")
         if self.appearance is not None:
             self._validate_appearance(self.appearance)
         return self

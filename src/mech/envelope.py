@@ -4,7 +4,13 @@ Projects the brief's `harness_anchors` declarations into the wire-side
 `EnvelopeSource` schema:
 
     {schema_version: 1, system: "mech",
-     anchors: [{name, kind, position_mm?}]}
+     anchors: [{name, kind, position_mm?}],
+     keepouts: [{name, min_mm, max_mm}]}
+
+`keepouts` are axis-aligned boxes in the anchor frame (assembly bbox
+minimum corner): the enclosure board volume (`board`, floor to board top
+plus `keepout_height_mm`) and the brief `harness_keepouts`. wire's
+`route_keepout` gate fails a route whose anchor polyline enters one.
 
 The emitted file is a deterministic projection of the brief; the wire
 importer validates it again and records its sha256.
@@ -33,7 +39,41 @@ def envelope_source(brief: DesignBrief) -> dict[str, object]:
         if anchor.position_mm is not None:
             entry["position_mm"] = list(anchor.position_mm)
         anchors.append(entry)
-    return {"schema_version": 1, "system": "mech", "anchors": anchors}
+    return {
+        "schema_version": 1,
+        "system": "mech",
+        "anchors": anchors,
+        "keepouts": _keepouts(brief),
+    }
+
+
+def _keepouts(brief: DesignBrief) -> list[dict[str, object]]:
+    """Board volume plus declared keep-outs, in the anchor frame."""
+    boxes: list[dict[str, object]] = []
+    spec = brief.enclosure
+    if spec is not None and spec.board is not None:
+        board = spec.board
+        # The shell is centred on x/y with its floor at z=0, so the anchor
+        # frame (bbox min corner) is shifted by half the outer size.
+        x0 = (spec.width_mm - board.width_mm) / 2
+        y0 = (spec.depth_mm - board.depth_mm) / 2
+        top = spec.floor_mm + spec.standoff_height_mm + board.thickness_mm
+        boxes.append(
+            {
+                "name": "board",
+                "min_mm": [round(x0, 4), round(y0, 4), round(spec.floor_mm, 4)],
+                "max_mm": [
+                    round(x0 + board.width_mm, 4),
+                    round(y0 + board.depth_mm, 4),
+                    round(top + board.keepout_height_mm, 4),
+                ],
+            }
+        )
+    boxes.extend(
+        {"name": box.name, "min_mm": list(box.min_mm), "max_mm": list(box.max_mm)}
+        for box in brief.harness_keepouts
+    )
+    return boxes
 
 
 def _validate_decision_refs(decision_refs: list[str], brief_path: Path | None) -> list[str]:

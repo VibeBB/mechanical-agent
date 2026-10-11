@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `export-envelope` writes `keepouts` for wire-agent's `route_keepout`
+  gate: the enclosure board volume (`board`) and the new brief
+  `harness_keepouts[]` boxes, in the harness anchor frame.
 - `board-envelope` / `mech_board_envelope`: export the board cavity (size,
   mount holes, top/bottom part height limits, side-face openings in the board
   frame) as `*.mech-board-envelope.json` for circuit-agent's

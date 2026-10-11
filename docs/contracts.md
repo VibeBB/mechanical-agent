@@ -15,7 +15,10 @@ openings, vents), `bracket` (`BracketSpec`: legs, thickness, holes,
 gusset), `spur_gear` (`SpurGearSpec`: module, teeth, face width, bore,
 helix); plus `fits[]`, `stackups[]`, `mechanism_features[]`,
 `harness_anchors[]` (`{name, kind: clip|grommet|breakout|other,
-position_mm?}`). `position_mm` is measured from the **minimum corner of
+position_mm?}`), `harness_keepouts[]` (`{name, min_mm, max_mm}`:
+axis-aligned boxes in the same anchor frame the wire harness must not
+route through; min below max on every axis, unique names, `board`
+reserved). `position_mm` is measured from the **minimum corner of
 the generated assembly's axis-aligned bounding box** (x = width, y =
 depth, z up) — the same lower-left convention the DXF hole tables use.
 The `harness_anchor.within_envelope` gate check (`{id, subject,
@@ -131,8 +134,12 @@ sha256, note}` — image evidence is byte-verified by `check_intake`).
   `enclosure.ruggedness` the gate emits nothing.
 
 - `*.envelope.json` — wire-agent `EnvelopeSource`: `{schema_version: 1,
-  system: "mech", anchors: [{name, kind, position_mm?}]}` (unchanged —
-  wire validates strict).
+  system: "mech", anchors: [{name, kind, position_mm?}], keepouts:
+  [{name, min_mm, max_mm}]}` (wire validates strict). `keepouts` is
+  always written: the enclosure board volume as `board` (board footprint,
+  floor to board top + `keepout_height_mm`) plus the brief
+  `harness_keepouts`, in the anchor frame. wire's `route_keepout` gate
+  fails a route whose anchor polyline enters one.
 - `*.envelope.provenance.json` — `{schema_version: 1, system: "mech",
   envelope_sha256, brief_path?, brief_sha256?, design_report_sha256?,
   decision_refs?, anchor_frame: "assembly-bbox-min-corner"?,
