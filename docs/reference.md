@@ -117,6 +117,13 @@ MCP are confined to `OPENHANDS_PROJECT_DIR` (`workspace.py`).
 - `write_appearance(brief, out_dir)` → writes `<name>.mech-appearance.json`;
   returns `path`, `sha256`, `surfaces`, `samples`.
 
+## board_envelope.py
+
+- `board_envelope_payload(brief)` → `mech_board_envelope` v1 payload; raises
+  `ValueError` without `enclosure.board`.
+- `write_board_envelope(brief, out_dir)` → writes
+  `<name>.mech-board-envelope.json`; returns `path`, `sha256`, `openings`.
+
 ## sim_request.py
 
 - `opening_min_dims(enclosure)` → IP probe size of every opening and vent slot.

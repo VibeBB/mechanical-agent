@@ -108,6 +108,20 @@ in a visual inspection's `limit_samples`, and its `appearance.limit_samples`
 gate fails until every pair is held by a visual attribute inspection. mech
 does not make the physical samples; it owns their criteria.
 
+## Board envelope → circuit
+
+`board-envelope` / `mech_board_envelope` projects the enclosure board cavity
+into the circuit board frame (`board_center_y_up_mm`) as
+`<name>.mech-board-envelope.json` (`artifact_kind: mech_board_envelope`, the
+brief sha256). It carries the board size, thickness and mount holes the
+standoffs expect; `max_height_top_mm` (inner lid face minus the board top
+surface); `max_height_bottom_mm` (the standoff height); and every side-face
+opening as `along_mm` (the face-local span `board_geometry` compares with a
+connector courtyard) plus `z_mm` (measured from the board top surface).
+circuit-agent pins the file by sha256 in its brief and gates part heights
+and edge connectors against it (`circuit.enclosure`), so a part that would
+not fit fails in circuit before mech re-imports the board.
+
 ## UX CMF → mech
 
 UX-creator owns the product's colors, materials and finishes (`cmf` in
