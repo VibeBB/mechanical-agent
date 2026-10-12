@@ -45,12 +45,12 @@ def test_lock_versions_cover_direct_deps():
     missing = [name for name in deps if name not in versions]
     assert missing == []
     assert versions["build123d"] == "0.13.0"
-    assert versions["openhands-sdk"] == "1.53.0"
+    assert versions["openhands-sdk"] == "1.54.0"
     assert versions["pytest-cov"] == "7.1.0"
 
 
 def test_uv_pin_parsed():
-    assert uv_version_pin(ROOT) == "==0.12.23"
+    assert uv_version_pin(ROOT) == "==0.13.0"
 
 
 def test_workflow_files_have_expected_suffixes():
@@ -60,7 +60,7 @@ def test_workflow_files_have_expected_suffixes():
 
 def test_docker_arg_pins_parsed():
     args = docker_arg_pins(ROOT)
-    assert args["UV_VERSION"] == "0.12.23"
+    assert args["UV_VERSION"] == "0.13.0"
 
 
 def test_docker_arg_matches_uv_pin():

@@ -4,6 +4,14 @@ This document records the pinned versions in use, where they come from, and
 the adoption decision for each. Update it in the same change that touches
 `pyproject.toml`, a workflow pin, or a new external source.
 
+## 2026-10-12 update (sdk 1.54.0, uv 0.13.0)
+
+| Component | From -> to | Changelog review decision |
+| --- | --- | --- |
+| openhands-sdk / openhands-tools | 1.53.0 -> 1.54.0 | See `docs/research/sdk-v1.54.0-feature-evaluation.md`. |
+| uv | 0.12.23 -> 0.13.0 | Breaking-change review in the same document; `[tool.uv] required-version` and Dockerfile ARG updated. |
+| python-version (all surfaces) | deferred | 3.15 blocked solely by `openhands-sdk->litellm->fastuuid 0.14.0` (sdist-only, bundled PyO3 fails to build on 3.15; pydantic-core 2.50.1 already ships cp315 wheels). Wildcard deferral `python-version/*`, review_by 2027-01-08. |
+
 ## Runtime dependencies (pyproject.toml + uv.lock)
 
 | Package | Pin | Source | Decision |
@@ -12,8 +20,8 @@ the adoption decision for each. Update it in the same change that touches
 | ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.53.0` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.53.0` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.54.0` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.54.0` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
@@ -38,7 +46,7 @@ the adoption decision for each. Update it in the same change that touches
 
 | Tool | Pin | Where |
 | --- | --- | --- |
-| uv | `==0.12.23` | `[tool.uv] required-version` |
+| uv | `==0.13.0` | `[tool.uv] required-version` |
 | Python | `>=3.12`, CI matrix 3.12/3.13/3.14 + 3.15 canary | pyproject `requires-python` |
 | zizmor | `1.30.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
 | actionlint | `1.7.12` (sha256-verified release tarball) | `workflow-lint.yml` |
@@ -66,7 +74,7 @@ All `uses:` entries are pinned to a 40-char SHA with a `# vX.Y.Z` comment:
 | Item | Pin | Where |
 | --- | --- | --- |
 | debian base image | `13-slim` | `docker/mech-tools.Dockerfile` `FROM` |
-| uv | `0.12.23` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
+| uv | `0.13.0` | `docker/mech-tools.Dockerfile` `ARG UV_VERSION` (must equal `[tool.uv] required-version`) |
 | Python in image | `3.14` | `uv python install`/`uv venv`/`python3.x` inside the Dockerfile |
 | librsvg2-bin | unpinned | `docker/mech-tools.Dockerfile` apt install (rasterizer for `mech_render`) |
 
@@ -147,7 +155,7 @@ only while `review_by` has not passed and still matches the reported
 
 | Surface | Name | Latest | Re-check | Reason |
 | --- | --- | --- | --- | --- |
-| pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.53.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
+| pypi | mcp | 2.3.0 | 2027-04-01 | `openhands-sdk` 1.54.0 -> `fastmcp<4` -> `fastmcp-slim` requires `mcp>=1.24.0,<2.0`; mcp 2.x cannot coexist with the SDK pin. |
 
 ## Not covered
 
@@ -156,12 +164,12 @@ only while `review_by` has not passed and still matches the reported
   surface reports drift but bumps still ride direct spec changes
   (`uv lock --upgrade` when applied).
 
-## Decisions - 2026-10-07 round (SDK 1.53.0)
+## Decisions - 2026-10-07 round (SDK 1.54.0)
 
 | Component | From -> To | Decision |
 | --- | --- | --- |
-| `openhands-sdk` / `openhands-tools` (main deps) | 1.52.0 -> 1.53.0 | Adopted. All 6 upstream PRs reviewed; see [SDK v1.53.0 feature evaluation](research/sdk-v1.53.0-feature-evaluation.md). mech-server rides `sdk:openhands-agent-server/v${SDK_VERSION}` from the lock pin at publish time — no committed lock is edited. |
-| mcp | stays <2 | Deferred: `openhands-sdk` 1.53.0 still requires `fastmcp<4` -> `mcp<2`; reason refreshed to cite 1.53.0, `review_by` unchanged. |
+| `openhands-sdk` / `openhands-tools` (main deps) | 1.52.0 -> 1.54.0 | Adopted. All 6 upstream PRs reviewed; see [SDK v1.54.0 feature evaluation](research/sdk-v1.54.0-feature-evaluation.md). mech-server rides `sdk:openhands-agent-server/v${SDK_VERSION}` from the lock pin at publish time — no committed lock is edited. |
+| mcp | stays <2 | Deferred: `openhands-sdk` 1.54.0 still requires `fastmcp<4` -> `mcp<2`; reason refreshed to cite 1.54.0, `review_by` unchanged. |
 
 ## Decisions - 2026-10-05 round (SDK 1.52.0)
 
@@ -176,7 +184,7 @@ Adopted now:
 
 | Component | From | To | Evaluation |
 |-----------|------|----|------------|
-| uv | 0.12.22 | 0.12.23 | Point release; dependency resolution and managed-Python fixes. No workflow changes required. |
+| uv | 0.12.22 | 0.13.0 | Point release; dependency resolution and managed-Python fixes. No workflow changes required. |
 | Python pins | 3.12 | 3.14 | Image `uv python install`/`uv venv`/`python3.x` and `.python-version` now resolve 3.14; ci.yml matrix gains a 3.14 leg. |
 | Python 3.15 | - | canary leg | Experimental matrix leg runs each step with `continue-on-error`; a `::warning::` annotation records forward-compat failures without failing the check. |
 
