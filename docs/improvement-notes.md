@@ -26,7 +26,7 @@ problem, evidence, done / not-done and why.
   `<name>.envelope.provenance.json` (envelope/brief/report sha256 +
   optional decision refs); the envelope schema itself is unchanged so
   wire's strict `EnvelopeSource` still validates it.
-- **Stale uv pin in CONTRIBUTING.md.** `uv ==0.12.22` → `==0.12.23`
+- **Stale uv pin in CONTRIBUTING.md.** `uv ==0.12.22` → `==0.13.0`
   (`pyproject.toml [tool.uv] required-version`). Evidence:
   `CONTRIBUTING.md` line 10.
 - **rsvg/baseline/hash helpers factored.** `render.py` now exposes
