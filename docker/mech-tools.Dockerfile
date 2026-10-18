@@ -47,11 +47,10 @@ RUN for attempt in 1 2 3 4 5; do \
             libfreetype6 \
             libfontconfig1 \
             librsvg2-bin \
-        # The pinned base digest keeps shipping libpcre2-8-0 10.46-1~deb13u2;
-        # upgrade it in-build to the fixed deb13u3 (CVE-2026-103111) so the
-        # publish-time Trivy gate stays green between base-digest bumps.
-        && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends \
-            --only-upgrade -y libpcre2-8-0 \
+        # Apply every Debian security fix published after the pinned base
+        # digest so the publish Trivy gate cannot trip on fixable findings
+        # (apt always pulls the latest published fix).
+        && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 upgrade -y --no-install-recommends \
         && rm -rf /var/lib/apt/lists/* \
         && break; \
         [ "$attempt" = 5 ] && exit 1; \
