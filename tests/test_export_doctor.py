@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-import ezdxf
 import pytest
 
 import mech.export as export_module
@@ -189,7 +189,7 @@ def test_dxf_volatile_fields_pinned(enclosure_brief: DesignBrief, tmp_path: Path
     design = generate(enclosure_brief)
     export_design(enclosure_brief, design, out_dir)
     text = (out_dir / "demo-shell.dxf").read_text(encoding="utf-8")
-    assert f"{ezdxf.__version__} @ 0" in text
-    assert not re.search(rf"{re.escape(ezdxf.__version__)} @ 2", text)
+    assert f"{version('ezdxf')} @ 0" in text
+    assert not re.search(rf"{re.escape(version('ezdxf'))} @ 2", text)
     cleaned = text.replace("{00000000-0000-0000-0000-000000000000}", "")
     assert not re.search(r"\{[0-9A-Fa-f-]{36}\}", cleaned)

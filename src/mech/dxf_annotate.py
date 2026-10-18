@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import re
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +44,7 @@ _ARROW_RATIO = 0.30
 _DIAMETER_ANGLE_DEG = 45.0
 # ezdxf stamps wall-clock datetimes, version banners, and placeholder GUIDs;
 # all are pinned after saveas so exports stay byte-reproducible.
-_EZDXF_VERSION_PATTERN = re.compile(r"^" + re.escape(ezdxf.__version__) + r" @ .*$", re.MULTILINE)
+_EZDXF_VERSION_PATTERN = re.compile(r"^" + re.escape(version("ezdxf")) + r" @ .*$", re.MULTILINE)
 _GUID_PATTERN = re.compile(r"\{[0-9A-Fa-f-]{36}\}")
 _NIL_GUID = "{00000000-0000-0000-0000-000000000000}"
 
@@ -618,6 +619,6 @@ def annotate_dxf(
     doc.header["$TDUPDATE"] = 0.0
     doc.saveas(str(path))
     text = path.read_text(encoding="utf-8", errors="replace")
-    text = _EZDXF_VERSION_PATTERN.sub(f"{ezdxf.__version__} @ 0", text)
+    text = _EZDXF_VERSION_PATTERN.sub(f"{version('ezdxf')} @ 0", text)
     text = _GUID_PATTERN.sub(_NIL_GUID, text)
     path.write_text(text, encoding="utf-8")
