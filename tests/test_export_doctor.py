@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -87,7 +88,7 @@ def test_export_deterministic(enclosure_brief: DesignBrief, tmp_path: Path):
         tokens: list[str] = []
         for t in lines[start:end]:
             t = t.strip()
-            if t.startswith("{") or t.startswith("1.4.4 @"):
+            if t.startswith("{") or re.match(r"1\.4\.\d+ @", t):
                 continue
             try:
                 # OCCT may flip a circle centre's sign on symmetric holes;
@@ -188,7 +189,7 @@ def test_dxf_volatile_fields_pinned(enclosure_brief: DesignBrief, tmp_path: Path
     design = generate(enclosure_brief)
     export_design(enclosure_brief, design, out_dir)
     text = (out_dir / "demo-shell.dxf").read_text(encoding="utf-8")
-    assert "1.4.4 @ 0" in text
-    assert not re.search(r"1\.4\.4 @ 2", text)
+    assert f"{version('ezdxf')} @ 0" in text
+    assert not re.search(rf"{re.escape(version('ezdxf'))} @ 2", text)
     cleaned = text.replace("{00000000-0000-0000-0000-000000000000}", "")
     assert not re.search(r"\{[0-9A-Fa-f-]{36}\}", cleaned)
