@@ -75,6 +75,9 @@ docs/adr/  docs/research/
 - Never write API keys, tokens, or secrets to logs, inputs, or commits.
 - Provide negative tests that deliberately corrupt the judged input and
   confirm the corrupted input fails (see `tests/test_gates.py`).
+- Version expectations and pins in source code must derive from files
+  the dependency-update checker covers (pyproject pins, lockfiles,
+  Dockerfiles, workflow pins); do not hardcode a second copy.
 
 ## Plugin boundary
 
