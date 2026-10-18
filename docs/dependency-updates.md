@@ -4,6 +4,17 @@ This document records the pinned versions in use, where they come from, and
 the adoption decision for each. Update it in the same change that touches
 `pyproject.toml`, a workflow pin, or a new external source.
 
+## 2026-10-18 update (sdk 1.55.1, uv 0.13.1, ezdxf 1.4.5)
+
+sdk `==1.54.0` -> `==1.55.1` (sdk + tools), uv `==0.13.0` -> `==0.13.1`,
+zizmor `1.30.1` -> `1.31.1`, trivy `v0.75.0` -> `v0.76.0`, codeql-action
+v4.38.3 -> v4.39.0. Full changelog review:
+[SDK v1.55.1 feature evaluation](research/sdk-v1.55.1-feature-evaluation.md).
+Deferrals unchanged (mcp 2.x, Python 3.15 default, Tauri 3.0.0-alpha where
+applicable); reasons refreshed to cite SDK 1.55.1.
+
+ezdxf `==1.4.4` -> `==1.4.5`.
+
 ## 2026-10-12 update (sdk 1.54.0, uv 0.13.0)
 
 | Component | From -> to | Changelog review decision |
@@ -17,11 +28,11 @@ the adoption decision for each. Update it in the same change that touches
 | Package | Pin | Source | Decision |
 | --- | --- | --- | --- |
 | build123d | `==0.13.0` | PyPI | Exact pin — CAD kernel behavior is release-sensitive (mesh/boolean edge cases verified against this version). Bundles OCP (OCCT 7.9) and ezdxf. Requires the `pillow>=12.3.0,<13` `override-dependencies` entry (see "Overrides"). |
-| ezdxf | `==1.4.4` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
+| ezdxf | `==1.4.5` | PyPI | Exact pin — DXF annotation output is serializer-sensitive (byte-reproducible exports verified against this version); also arrives transitively via build123d. |
 | pydantic | `>=2` | PyPI | Floor pin — v2 API only (`model_validate`, `model_dump`). |
 | mcp | `>=1.29,<2` | PyPI | stdio server boundary; `<2` caps the breaking major. |
-| openhands-sdk | `==1.54.0` | PyPI | Exact pin — plugin API contract. |
-| openhands-tools | `==1.54.0` | PyPI | Exact pin — matches SDK. |
+| openhands-sdk | `==1.55.1` | PyPI | Exact pin — plugin API contract. |
+| openhands-tools | `==1.55.1` | PyPI | Exact pin — matches SDK. |
 
 ## Dev dependencies (dev group)
 
@@ -46,11 +57,11 @@ the adoption decision for each. Update it in the same change that touches
 
 | Tool | Pin | Where |
 | --- | --- | --- |
-| uv | `==0.13.0` | `[tool.uv] required-version` |
+| uv | `==0.13.1` | `[tool.uv] required-version` |
 | Python | `>=3.12`, CI matrix 3.12/3.13/3.14 + 3.15 canary | pyproject `requires-python` |
-| zizmor | `1.30.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
+| zizmor | `1.31.1` (sha256-verified wheel pin, no longer a uvx pin) | `workflow-lint.yml` |
 | actionlint | `1.7.12` (sha256-verified release tarball) | `workflow-lint.yml` |
-| trivy | `v0.75.0` (`version:` input on `aquasecurity/trivy-action` + `aquasecurity/setup-trivy`) | `publish-mech-images.yml`, `container-audit.yml` |
+| trivy | `v0.76.0` (`version:` input on `aquasecurity/trivy-action` + `aquasecurity/setup-trivy`) | `publish-mech-images.yml`, `container-audit.yml` |
 
 ## GitHub Actions pins
 
