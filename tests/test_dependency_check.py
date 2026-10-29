@@ -18,6 +18,7 @@ from scripts.check_dependency_updates import (
     check_docker_args,
     check_git_clones,
     check_python_versions,
+    check_sdk_lock_resolution,
     check_workflow_downloads,
     dependency_names,
     docker_arg_pins,
@@ -392,3 +393,60 @@ def test_python_versions_still_flag_source_without_latest(
     ci_statuses = [status for status in statuses if status.source.endswith("ci.yml")]
     assert ci_statuses
     assert all(status.outdated for status in ci_statuses)
+
+
+def test_check_sdk_lock_resolution_flags_stale_and_unfixed(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\ndependencies = [\n    "openhands-sdk==1.59.0",\n]\n',
+        encoding="utf-8",
+    )
+    upstream_py = '    "litellm==1.94.0",\n'
+    lock = (
+        'name = "litellm"\nversion = "1.93.0"\n\n'
+        'name = "pillow"\nversion = "13.0.0"\n\n'
+        'name = "fsspec"\nversion = "2026.6.0"\n'
+    )
+
+    def fetch_text(url: str) -> str:
+        return upstream_py if url.endswith("pyproject.toml") else lock
+
+    statuses = check_sdk_lock_resolution(tmp_path, fetch_text=fetch_text)
+    by_name = {status.name: status for status in statuses}
+    pin = by_name["sdk-litellm-pin"]
+    assert pin.outdated
+    assert pin.latest == "==1.94.0"
+    resolved = by_name["sdk-lock-resolution"]
+    assert not resolved.outdated
+    assert "litellm" in resolved.note
+
+
+def test_check_sdk_lock_resolution_flags_step_removable(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\ndependencies = [\n    "openhands-sdk==1.60.0",\n]\n',
+        encoding="utf-8",
+    )
+    upstream_py = '    "litellm==1.93.0",\n'
+    lock = "\n\n".join(
+        f'name = "{pkg}"\nversion = "{floor}"'
+        for pkg, floor in {
+            "fsspec": "2026.6.0",
+            "litellm": "1.100.4",
+            "pillow": "13.0.0",
+            "pypdf": "6.21.2",
+            "aiohttp": "3.14.4",
+            "authlib": "1.9.1",
+            "oauthlib": "4.0.0",
+            "dnspython": "2.9.0",
+            "virtualenv": "21.14.9",
+            "filelock": "4.2.1",
+        }.items()
+    )
+
+    def fetch_text(url: str) -> str:
+        return upstream_py if url.endswith("pyproject.toml") else lock
+
+    statuses = check_sdk_lock_resolution(tmp_path, fetch_text=fetch_text)
+    by_name = {status.name: status for status in statuses}
+    resolved = by_name["sdk-lock-resolution"]
+    assert resolved.outdated
+    assert "reduced or dropped" in resolved.note

@@ -24,6 +24,30 @@ on:
       # merged pin PR does not trigger another publish.
       - "!plugins/mech/skills/mech-workflow/tools-image.json"
       - "!docker/README.md"
+  pull_request:
+    # Dry-run rehearsal: build --load + Trivy gates only; every irreversible
+    # step below is normalized to skip on pull_request events.
+    paths:
+      - "docker/**"
+      - ".dockerignore"
+      - "src/**"
+      - "plugins/mech/**"
+      - "examples/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "scripts/e2e_authoring.py"
+      - "scripts/measure_image_tools.py"
+      - "scripts/print_locked_image.py"
+      - "scripts/pull_locked_image.py"
+      - "scripts/update_image_digest_lock.py"
+      - ".github/workflows/publish-mech-images.yml"
+      - "scripts/publish_image_pin_pr.sh"
+      - "scripts/package_level_sbom.py"
+      - "!docker/image-digests.json"
+      # The plugin pin is written by this workflow itself; exclude it so a
+      # merged pin PR does not trigger another publish.
+      - "!plugins/mech/skills/mech-workflow/tools-image.json"
+      - "!docker/README.md"
   workflow_dispatch:
     inputs:
       skip_tools:
@@ -49,8 +73,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 120
     # Manual dispatch inherits the full write permission set below, so it
-    # must never build/sign/push images from a non-main ref.
-    if: github.ref == 'refs/heads/main'
+    # must never build/sign/push images from a non-main ref; pull_request
+    # runs are the dry-run rehearsal — every irreversible step is gated off.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     # actions approves approval-gated runs and dispatches the lock-branch and
     # post-merge checks; contents pushes the lock branch; packages pushes the
     # ghcr.io images; pull-requests opens and merges the digest-lock PR.
@@ -122,8 +147,8 @@ jobs:
             IMAGE_REVISION=${{ github.sha }}
           # dry_run keeps the image in the local daemon for the gates
           # below; nothing reaches the registry.
-          push: ${{ inputs.dry_run != true }}
-          load: ${{ inputs.dry_run == true }}
+          push: ${{ (inputs.dry_run != true && github.event_name != 'pull_request') }}
+          load: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') }}
           # Only the immutable per-sha tag is pushed at build time; the
           # mutable :latest tag is promoted after every gate below passes,
           # so a failed scan never serves a new :latest.
@@ -137,7 +162,7 @@ jobs:
       - name: Resolve tools digest
         env:
           BUILT_DIGEST: ${{ steps.tools.outputs.digest }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.skip_tools }}" = true ]; then
@@ -165,7 +190,7 @@ jobs:
       # digest-lock update that reads its attestation-url output.
       - name: Attest tools image provenance
         id: attest
-        if: inputs.skip_tools != true && inputs.dry_run != true
+        if: inputs.skip_tools != true && (inputs.dry_run != true && github.event_name != 'pull_request')
         background: true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -199,6 +224,15 @@ jobs:
           fi
           sed -i 's/litellm = "2026-07-20T00:00:00Z", //' "$RUNNER_TEMP/sdk/pyproject.toml"
           grep -q 'litellm = "2026-07-20T00:00:00Z"' "$RUNNER_TEMP/sdk/pyproject.toml" && exit 1 || true
+          # litellm caps filelock<4.0; add an override so the lock can take
+          # the fixed 4.x line (mirrors the repos' own pyproject overrides).
+          if grep -q 'override-dependencies' "$RUNNER_TEMP/sdk/pyproject.toml"; then
+            grep -q 'override-dependencies = \[[^]]*filelock' "$RUNNER_TEMP/sdk/pyproject.toml" || \
+              sed -i 's/override-dependencies = \[/override-dependencies = ["filelock>=4.2.1", /' "$RUNNER_TEMP/sdk/pyproject.toml"
+          else
+            sed -i '/^\[tool\.uv\]/a override-dependencies = ["filelock>=4.2.1"]' "$RUNNER_TEMP/sdk/pyproject.toml"
+          fi
+          grep -q '"filelock>=4.2.1"' "$RUNNER_TEMP/sdk/pyproject.toml"
           uv lock --project "$RUNNER_TEMP/sdk" \
             --upgrade-package fsspec --upgrade-package litellm \
             --upgrade-package pillow --upgrade-package pypdf \
@@ -242,7 +276,7 @@ jobs:
         background: true
         env:
           SDK_SHA: ${{ github.sha }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') }}
           # No CUSTOM_TAGS: the mutable tags (<sha>-latest-source and
           # main-latest-source) are promoted after every gate below passes,
           # so a failed scan never serves a new mutable tag.
@@ -318,7 +352,7 @@ jobs:
             uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
             env:
               # dry_run reads the just-built image from the local daemon.
-              SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: ${{ inputs.dry_run == true && 'docker' || 'registry' }}
+              SYFT_SOURCE_IMAGE_DEFAULT_PULL_SOURCE: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') && 'docker' || 'registry' }}
               TMPDIR: ${{ runner.temp }}
               SYFT_FILE_METADATA_SELECTION: none
             with:
@@ -337,7 +371,7 @@ jobs:
           - name: Verify published tools smoke
             env:
               TOOLS_REF: ${{ env.TOOLS_REF }}
-              DRY_RUN: ${{ inputs.dry_run }}
+              DRY_RUN: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') }}
             run: |
               set -euo pipefail
               mkdir -p "$RUNNER_TEMP/mech-smoke"
@@ -423,7 +457,7 @@ jobs:
       # a background step and join it with the provenance attestation
       # before the digest-lock update that reads both outputs.
       - name: Attest tools SBOM
-        if: inputs.skip_tools != true && inputs.dry_run != true
+        if: inputs.skip_tools != true && (inputs.dry_run != true && github.event_name != 'pull_request')
         id: attest_sbom
         background: true
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -451,7 +485,7 @@ jobs:
       - name: Resolve server digest
         env:
           BUILD_TAGS_CSV: ${{ steps.build_server.outputs.tags_csv }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ (inputs.dry_run == true || github.event_name == 'pull_request') }}
         run: |
           set -euo pipefail
           SERVER_TAG=$(
@@ -564,7 +598,7 @@ jobs:
         # digests. imagetools create copies the manifest server-side — no
         # re-push — so the provenance and SBOM attestations keep
         # referencing the same digest.
-        if: inputs.dry_run != true
+        if: (inputs.dry_run != true && github.event_name != 'pull_request')
         env:
           SKIP_TOOLS: ${{ inputs.skip_tools }}
         run: |
@@ -581,7 +615,7 @@ jobs:
             "ghcr.io/${IMAGE_OWNER}/mech-server@${SERVER_DIGEST}"
       - name: Update digest lock and merge PR
         # dry_run stops at the summary: no lock PR, no post-merge dispatches.
-        if: inputs.dry_run != true
+        if: (inputs.dry_run != true && github.event_name != 'pull_request')
         env:
           GH_TOKEN: ${{ github.token }}
           ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
@@ -672,20 +706,20 @@ jobs:
           bash scripts/publish_image_pin_pr.sh "$pr_url" "$branch" "" "ci.yml locked-image-check.yml"
       - name: Upload tools Trivy SARIF
         # A rehearsal must not file code-scanning alerts.
-        if: always() && inputs.dry_run != true && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
+        if: always() && (inputs.dry_run != true && github.event_name != 'pull_request') && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-mech-tools.sarif
           category: trivy-mech-tools
       - name: Upload server Trivy SARIF
         # A rehearsal must not file code-scanning alerts.
-        if: always() && inputs.dry_run != true && hashFiles('trivy-mech-server.sarif') != ''
+        if: always() && (inputs.dry_run != true && github.event_name != 'pull_request') && hashFiles('trivy-mech-server.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-mech-server.sarif
           category: trivy-mech-server
       - name: Note dry-run skips
-        if: inputs.dry_run
+        if: (inputs.dry_run == true || github.event_name == 'pull_request')
         run: |
           {
             echo "### dry-run rehearsal"
