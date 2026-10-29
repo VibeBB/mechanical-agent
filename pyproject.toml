@@ -35,8 +35,11 @@ required-version = "==0.13.6"
 # threejs-materials<1.3 (required by build123d>=0.13) caps pillow<12.3,
 # which conflicts with openhands-sdk>=1.49.5's pillow>=12.3. threejs-materials
 # feeds build123d's viewer/material export only, so overriding the pillow
-# bound is safe for the mech generation/gate path.
-override-dependencies = ["pillow>=12.3.0,<13"]
+# bound is safe for the mech generation/gate path; threejs-materials 1.2.5
+# itself allows pillow<14, so <14 is honest. litellm>=1.104 pins
+# filelock<4.0, which keeps the image-publish Trivy gate on CVE-2026-112940;
+# filelock's locking API is unchanged in 4.x, so the override is safe.
+override-dependencies = ["pillow>=12.3.0,<14", "filelock>=4.2.1"]
 
 [tool.ruff]
 line-length = 100
