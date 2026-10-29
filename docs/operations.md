@@ -386,6 +386,23 @@ node_modules, bundled Go binaries (rootlesskit, gh, docker-buildx, docker-compos
 upstream Dockerfile copies (DS-0029). They clear on the next
 openhands-sdk bump — tracked in `scripts/dependency_update_deferrals.json`.
 
+2026-10-29: the refreshed Trivy DB flagged newly fixable SDK `.venv`
+packages on `mech-server` — litellm 1.93.0 (CVE-2026-114612), pillow
+12.3.0, pypdf 6.14.2, aiohttp 3.14.3, Authlib 1.6.12, oauthlib 3.3.1,
+dnspython 2.8.0, virtualenv 20.36.1 and filelock 3.20.3. The publish
+workflow now re-resolves each in the cloned SDK `uv.lock` before the
+`uv sync --frozen` server build (extending the fsspec patch pattern);
+litellm needed the SDK's `==1.93.0` workspace pin and its
+`exclude-newer-package` cutoff relaxed to `>=1.104,<1.106` — still below
+the documented mcp-2 boundary. On the tools image, pillow moved to
+13.0.0 (`threejs-materials` 1.2.5 allows `<14`) and filelock to 4.2.4
+via `override-dependencies` (litellm>=1.104 caps `filelock<4.0`).
+Unfixable vendored copies — undici inside nodejs_wheel/acp-node/
+openvscode-server npm trees (CVE-2026-109383/109829/109869/87018; npm
+12.2.1 still vendors 6.29.0) and msgpack 1.1.2 inside the managed
+CPython's ensurepip wheel (CVE-2026-114613) — join `.trivyignore` with
+`exp:2027-01-28` and re-verify on the next SDK bump.
+
 The weekly audit runs Lynis as container root (`--user 0`) with the
 committed `docker/lynis-container.prf` profile, which skips tests that
 are inapplicable inside a container (kernel/systemd/mounts/storage/
