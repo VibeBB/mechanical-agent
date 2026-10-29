@@ -826,7 +826,6 @@ def apply_deferrals(
     return applied
 
 
-
 def _pkg_version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
@@ -844,7 +843,7 @@ _SDK_LOCK_FLOORS = {
     "virtualenv": (21, 14, 9),
     "filelock": (4, 2, 1),
 }
-_SDK_PIN = re.compile(r'openhands-sdk==([0-9]+\.[0-9]+\.[0-9]+)')
+_SDK_PIN = re.compile(r"openhands-sdk==([0-9]+\.[0-9]+\.[0-9]+)")
 
 
 def _default_fetch_text(url: str) -> str:
@@ -854,9 +853,7 @@ def _default_fetch_text(url: str) -> str:
 
 
 def _lock_version(lock_text: str, pkg: str) -> str:
-    match = re.search(
-        rf'name = "{re.escape(pkg)}"\s*\nversion = "([^"]+)"', lock_text
-    )
+    match = re.search(rf'name = "{re.escape(pkg)}"\s*\nversion = "([^"]+)"', lock_text)
     return match.group(1) if match else ""
 
 
@@ -958,8 +955,7 @@ def check_sdk_lock_resolution(
                 "sdk-lock",
                 "sdk-lock-resolution",
                 f"SDK v{sdk_version}",
-                f"{len(_SDK_LOCK_FLOORS) - len(below)}/{len(_SDK_LOCK_FLOORS)} "
-                "at publish floors",
+                f"{len(_SDK_LOCK_FLOORS) - len(below)}/{len(_SDK_LOCK_FLOORS)} at publish floors",
                 source,
                 not below,
                 (
@@ -971,6 +967,7 @@ def check_sdk_lock_resolution(
             )
         )
     return statuses
+
 
 def check_dependency_updates(
     repo_root: Path,
