@@ -144,4 +144,6 @@ def test_ci_pytest_enforces_the_coverage_floor() -> None:
 def test_publish_dispatch_is_limited_to_main_or_pr() -> None:
     data = _load("publish-mech-images.yml")
     job: dict[Any, Any] = data["jobs"]["publish"]
-    assert job.get("if") == ("github.ref == 'refs/heads/main' || github.event_name == 'pull_request'")
+    assert job.get("if") == (
+        "github.ref == 'refs/heads/main' || github.event_name == 'pull_request'"
+    )
