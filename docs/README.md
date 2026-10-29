@@ -31,6 +31,7 @@
 - [research/sdk-v1.52.0-feature-evaluation.md](research/sdk-v1.52.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 - [research/sdk-v1.54.0-feature-evaluation.md](research/sdk-v1.54.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 - [research/sdk-v1.55.1-feature-evaluation.md](research/sdk-v1.55.1-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
+- [research/sdk-v1.59.0-feature-evaluation.md](research/sdk-v1.59.0-feature-evaluation.md) — OpenHands SDK/tools adoption decisions
 - [research/ac-v1.25-feature-evaluation.md](research/ac-v1.25-feature-evaluation.md) — Agent Canvas v1.25 surface adopt/defer decisions
 
 ## Accepted ADRs
