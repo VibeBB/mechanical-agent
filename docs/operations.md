@@ -531,3 +531,7 @@ When sweeping dependencies to latest releases:
 - 2026-10-29: Added `scripts/lint_workflows_local.sh`, which runs
   the same pinned actionlint + zizmor checks as workflow-lint.yml locally
   before pushing workflow edits.
+- 2026-10-30: `pull_request` publish rehearsals now switch buildx to the
+  `docker` driver for the server image build so the `--load`-built tools
+  tag resolves from the local daemon; real publishes keep the
+  docker-container driver for `--push`/multi-arch.
