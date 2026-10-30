@@ -176,9 +176,16 @@ jobs:
               fi
               image="${IMAGE_REF%@*}"
               digest="${IMAGE_REF#*@}"
-              gh attestation verify "oci://${image}@${digest}" \
-                --repo "$GITHUB_REPOSITORY" \
-                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"
+              # `gh attestation verify` intermittently fails to initialize
+              # the public-good Sigstore verifier; retry before failing.
+              for attempt in 1 2 3; do
+                if gh attestation verify "oci://${image}@${digest}" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml"; then
+                  break
+                fi
+                [ "$attempt" -lt 3 ] && sleep 15 || exit 1
+              done
           - name: Warn when tools image has no SBOM attestation
             if: needs.check-lock.outputs.sbom_attestation == ''
             run: echo "::warning::mech_tools image lock has no SBOM attestation; continuing"
@@ -190,10 +197,17 @@ jobs:
             run: |
               image="${IMAGE_REF%@*}"
               digest="${IMAGE_REF#*@}"
-              gh attestation verify "oci://${image}@${digest}" \
-                --repo "$GITHUB_REPOSITORY" \
-                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml" \
-                --predicate-type https://spdx.dev/Document/v2.3
+              # `gh attestation verify` intermittently fails to initialize
+              # the public-good Sigstore verifier; retry before failing.
+              for attempt in 1 2 3; do
+                if gh attestation verify "oci://${image}@${digest}" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish-mech-images.yml" \
+                  --predicate-type https://spdx.dev/Document/v2.3; then
+                  break
+                fi
+                [ "$attempt" -lt 3 ] && sleep 15 || exit 1
+              done
       # e2e_authoring exits non-zero unless the gate verdict is "pass"
       # (fail-closed), so the container exit code is the smoke check. The
       # smoke files are mounted from runner temp for failure artifacts.
