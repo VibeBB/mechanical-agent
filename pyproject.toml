@@ -8,6 +8,7 @@ dependencies = [
     "pydantic>=2",
     "build123d==0.13.0",
     "ezdxf==1.4.5",
+    "jsonschema>=4",
     "mcp>=2",
     "openhands-sdk==1.62.0",
     "openhands-tools==1.62.0",

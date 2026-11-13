@@ -2808,6 +2808,7 @@ source = { editable = "." }
 dependencies = [
     { name = "build123d" },
     { name = "ezdxf" },
+    { name = "jsonschema" },
     { name = "mcp" },
     { name = "openhands-sdk" },
     { name = "openhands-tools" },
@@ -2828,6 +2829,7 @@ dev = [
 requires-dist = [
     { name = "build123d", specifier = "==0.13.0" },
     { name = "ezdxf", specifier = "==1.4.5" },
+    { name = "jsonschema", specifier = ">=4" },
     { name = "mcp", specifier = ">=2" },
     { name = "openhands-sdk", specifier = "==1.62.0" },
     { name = "openhands-tools", specifier = "==1.62.0" },

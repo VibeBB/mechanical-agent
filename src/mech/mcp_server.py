@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from jsonschema import ValidationError, validate
 from mcp import types
 from mcp.server import Server, ServerRequestContext
 from mcp.server.lowlevel import NotificationOptions
@@ -527,6 +528,17 @@ _VRP_TOOLS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+    spec = next((tool for tool in tool_specs() if tool.name == name), None)
+    if spec is not None:
+        try:
+            validate(arguments, spec.input_schema)
+        except ValidationError as exc:
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(type="text", text=f"Input validation error: {exc.message}")
+                ],
+                is_error=True,
+            )
     try:
         if name == "mech_doctor":
             return _ok(run_doctor())
