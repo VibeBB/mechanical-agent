@@ -4,6 +4,24 @@ This document records the pinned versions in use, where they come from, and
 the adoption decision for each. Update it in the same change that touches
 `pyproject.toml`, a workflow pin, or a new external source.
 
+## 2026-11-14 update (sdk 1.62.0, mcp 2.3.0, uv 0.13.8)
+
+sdk `==1.59.0` -> `==1.62.0` (sdk + tools), uv `==0.13.6` -> `==0.13.8`,
+ruff -> `0.17.5` (lock), mcp `>=1.29,<2` -> `>=2` (the mcp-2.x deferral
+was consumed: SDK 1.62.0 requires fastmcp>=4 whose fastmcp-slim[client]
+pins mcp>=2, making the `<2` cap unsatisfiable; `mcp_server.py` and its
+tests migrated to the v2 API), trivy `v0.76.1` -> `v0.76.2`, codeql-action
+v4.39.1 -> v4.39.3, harden-runner v2.22.3 -> v2.22.4, docker/login-action
+v4.7.0 -> v4.8.0, zizmor `1.31.1` -> `1.32.0`; `pydantic` floated to
+2.14.3 in the lock. Full changelog review:
+[SDK v1.62.0 feature evaluation](research/sdk-v1.62.0-feature-evaluation.md).
+Deferrals: mcp entry removed (adopted); Python 3.15 default remains.
+
+Publish workflow: SDK 1.62.0 pins litellm==1.105.1 upstream (already above
+the 1.100.4 fix floor), so the Re-resolve step's litellm sed needles were
+dropped and the `sdk-litellm-pin` checker now flags only an upstream pin
+below the fix floor.
+
 ## 2026-10-29 update (sdk 1.59.0, uv 0.13.6)
 
 sdk `==1.55.1` -> `==1.59.0` (sdk + tools), uv `==0.13.1` -> `==0.13.6`,

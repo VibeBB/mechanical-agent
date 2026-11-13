@@ -864,11 +864,11 @@ def check_sdk_lock_resolution(
 ) -> list[DependencyStatus]:
     """Upstream SDK lock vs. the publish Re-resolve step's version floors.
 
-    The publish workflow relaxes the SDK's litellm pins and re-resolves the
-    cloned uv.lock so the agent-server venv clears the Trivy gate. This
-    check watches two upstream signals:
-      * sdk-litellm-pin: the SDK's litellm constraints the step sed-edits;
-        a changed shape means the step's needles may go stale (fail-closed).
+    The publish workflow re-resolves the cloned uv.lock so the agent-server
+    venv clears the Trivy gate. This check watches two upstream signals:
+      * sdk-litellm-pin: the SDK's litellm pin vs. the 1.100.4 fix floor;
+        a pin below the floor (or a missing pin) means the publish step
+        needs litellm relaxation needles restored (fail-closed).
       * sdk-lock-resolution: resolved versions for every package the step
         upgrades; when upstream already fixes all of them the step can be
         reduced or dropped.
@@ -897,7 +897,7 @@ def check_sdk_lock_resolution(
             DependencyStatus(
                 "sdk-lock",
                 "sdk-litellm-pin",
-                "==1.93.0 assumed by publish",
+                "publish needs no litellm relaxation when upstream pins >=1.100.4",
                 "?",
                 source,
                 False,
@@ -908,18 +908,19 @@ def check_sdk_lock_resolution(
     else:
         pin = re.search(r'"litellm==([^"]+)"', upstream_py)
         pin_text = f"=={pin.group(1)}" if pin else "absent"
+        below_floor = pin is None or _pkg_version_tuple(pin.group(1)) < _SDK_LOCK_FLOORS["litellm"]
         statuses.append(
             DependencyStatus(
                 "sdk-lock",
                 "sdk-litellm-pin",
-                "==1.93.0 assumed by publish",
+                "publish needs no litellm relaxation when upstream pins >=1.100.4",
                 pin_text,
                 source,
-                pin_text != "==1.93.0",
+                below_floor,
                 (
-                    "upstream litellm pin changed - re-verify the Re-resolve "
-                    "step's sed needles against the upstream pyproject"
-                    if pin_text != "==1.93.0"
+                    "upstream litellm pin below the fix floor or missing - "
+                    "restore litellm relaxation in the Re-resolve step"
+                    if below_floor
                     else ""
                 ),
             )

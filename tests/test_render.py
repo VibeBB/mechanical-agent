@@ -145,7 +145,7 @@ def test_mcp_render(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     dxf = _dxf(tmp_path)
     result = call_tool("mech_render", {"dxf_path": str(dxf)})
-    assert not result.isError
+    assert not result.is_error
     import json
 
     text_block = result.content[0]
@@ -154,7 +154,7 @@ def test_mcp_render(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert payload["verdict"] == "pass"
     image_blocks = [c for c in result.content if isinstance(c, types.ImageContent)]
     assert len(image_blocks) == 1
-    assert image_blocks[0].mimeType == "image/png"
+    assert image_blocks[0].mime_type == "image/png"
 
 
 def test_mcp_render_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -162,7 +162,7 @@ def test_mcp_render_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     result = call_tool("mech_render", {"dxf_path": str(tmp_path / "nope.dxf")})
-    assert result.isError
+    assert result.is_error
 
 
 @pytest.mark.skipif(_RSVG is None, reason="rsvg-convert not installed")
@@ -435,7 +435,7 @@ def test_mcp_render_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     step = _step(tmp_path)
     result = call_tool("mech_render_views", {"step": str(step)})
-    assert not result.isError
+    assert not result.is_error
     import json
 
     text_block = result.content[0]
@@ -444,14 +444,14 @@ def test_mcp_render_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert payload["verdict"] == "pass"
     assert payload["views"] == ["front", "top", "right", "isometric"]
     images = [c for c in result.content if isinstance(c, types.ImageContent)]
-    assert len(images) == 1 and images[0].mimeType == "image/png"
+    assert len(images) == 1 and images[0].mime_type == "image/png"
 
 
 def test_mcp_render_views_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from mech.mcp_server import call_tool
 
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
-    assert call_tool("mech_render_views", {"step": "nope.step"}).isError
+    assert call_tool("mech_render_views", {"step": "nope.step"}).is_error
 
 
 def test_screen_basis_matches_project_to_viewport() -> None:
@@ -724,11 +724,11 @@ def test_cli_and_mcp_render_section(
     assert payload["section_area_mm2"] == pytest.approx(264.0)
     monkeypatch.setenv("OPENHANDS_PROJECT_DIR", str(tmp_path))
     result = call_tool("mech_render_section", {"step": "shell.step", "axis": "y"})
-    assert not result.isError
+    assert not result.is_error
     data = json.loads(result.content[0].text)  # type: ignore[union-attr]
     assert data["axis"] == "y"
     assert any(getattr(item, "type", "") == "image" for item in result.content)
-    assert call_tool("mech_render_section", {"step": "shell.step", "axis": "q"}).isError
+    assert call_tool("mech_render_section", {"step": "shell.step", "axis": "q"}).is_error
     assert call_tool(
         "mech_render_section", {"step": "shell.step", "axis": "x", "offset_mm": "1"}
-    ).isError
+    ).is_error

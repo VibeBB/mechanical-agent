@@ -249,10 +249,10 @@ def test_mcp_appearance(
         "mech_appearance",
         {"brief": {**enclosure_brief_dict, "appearance": _appearance()}, "out_dir": "out"},
     )
-    assert not result.isError
+    assert not result.is_error
     assert (tmp_path / "out" / "demo.mech-appearance.json").is_file()
     outside = call_tool(
         "mech_appearance",
         {"brief": {**enclosure_brief_dict, "appearance": _appearance()}, "out_dir": "/etc/x"},
     )
-    assert outside.isError
+    assert outside.is_error

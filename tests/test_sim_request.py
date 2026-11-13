@@ -125,8 +125,8 @@ def test_mcp_sim_request_is_workspace_relative(
     brief = {**enclosure_brief_dict}
     brief["enclosure"] = {**brief["enclosure"], "ruggedness": {"ip_code": "IP40"}}
     result = call_tool("mech_sim_request", {"brief": brief, "out_dir": "sim"})
-    assert not result.isError
+    assert not result.is_error
     request = json.loads((tmp_path / "sim" / "demo.ruggedness.sim-request.json").read_text("utf-8"))
     assert request["brief_path"] == "sim/demo.ruggedness.sim.json"
     outside = call_tool("mech_sim_request", {"brief": brief, "out_dir": str(tmp_path.parent)})
-    assert outside.isError
+    assert outside.is_error

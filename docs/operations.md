@@ -364,6 +364,14 @@ Suppressions: `.hadolint.yaml` waivers above; `.trivyignore` holds
 time-boxed finding IDs — entries must carry an `exp:` date and a
 rationale line here when added.
 
+2026-11-14 (exp 2027-02-14): pyasn1 0.6.4 and soupsieve 2.8.4 inside the
+upstream agent-server `.venv` (CVE-2026-119194/119195/119196/119197,
+CVE-2026-126190/126191) and golang.org/x/net CVE-2026-78661 in
+upstream's bundled Go tools (gh, buildx, compose, rootlesskit). Same
+upstream-owned deferral as the existing `.venv`/vendored classes — the
+versions come from the upstream SDK image build, not this repo's
+uv.lock, and clear on upstream rebuilds with the fixed releases.
+
 The uv-managed CPython's bundled `pip` payload (vendored urllib3,
 msgpack, setuptools — never invoked; dependencies install via `uv` and
 the shipped venv is pip-less) is stripped in the `uv python install`

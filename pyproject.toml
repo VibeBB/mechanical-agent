@@ -8,9 +8,10 @@ dependencies = [
     "pydantic>=2",
     "build123d==0.13.0",
     "ezdxf==1.4.5",
-    "mcp>=1.29,<2",
-    "openhands-sdk==1.59.0",
-    "openhands-tools==1.59.0",
+    "jsonschema>=4",
+    "mcp>=2",
+    "openhands-sdk==1.62.0",
+    "openhands-tools==1.62.0",
 ]
 
 [dependency-groups]
@@ -31,7 +32,7 @@ build-backend = "hatchling.build"
 packages = ["src/mech"]
 
 [tool.uv]
-required-version = "==0.13.6"
+required-version = "==0.13.8"
 # threejs-materials<1.3 (required by build123d>=0.13) caps pillow<12.3,
 # which conflicts with openhands-sdk>=1.49.5's pillow>=12.3. threejs-materials
 # feeds build123d's viewer/material export only, so overriding the pillow

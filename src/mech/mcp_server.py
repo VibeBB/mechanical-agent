@@ -16,8 +16,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from jsonschema import ValidationError, validate
 from mcp import types
-from mcp.server import Server
+from mcp.server import Server, ServerRequestContext
 from mcp.server.lowlevel import NotificationOptions
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
@@ -50,8 +51,6 @@ from .standards import (
     PROCESS_LIMITS,
 )
 from .workspace import reject_symlinks, workspace_path, workspace_root
-
-server: Server = Server(f"mech-mcp/{__version__}")
 
 _SCHEMAS: dict[str, dict[str, Any]] = {
     "mech_doctor": {
@@ -406,7 +405,7 @@ def _error(reason: str) -> types.CallToolResult:
                 ),
             )
         ],
-        isError=True,
+        is_error=True,
     )
 
 
@@ -421,7 +420,7 @@ def _image_content(path: Path) -> types.ImageContent | None:
         data = base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError:
         return None
-    return types.ImageContent(type="image", data=data, mimeType=mime)
+    return types.ImageContent(type="image", data=data, mime_type=mime)
 
 
 def _path_arg(arguments: dict[str, Any], key: str) -> Path:
@@ -529,6 +528,17 @@ _VRP_TOOLS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+    spec = next((tool for tool in tool_specs() if tool.name == name), None)
+    if spec is not None:
+        try:
+            validate(arguments, spec.input_schema)
+        except ValidationError as exc:
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(type="text", text=f"Input validation error: {exc.message}")
+                ],
+                is_error=True,
+            )
     try:
         if name == "mech_doctor":
             return _ok(run_doctor())
@@ -751,10 +761,10 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
 def _anno(title: str, *, write: bool) -> types.ToolAnnotations:
     return types.ToolAnnotations(
         title=title,
-        readOnlyHint=not write,
-        destructiveHint=write,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=not write,
+        destructive_hint=write,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 
 
@@ -795,21 +805,28 @@ def tool_specs() -> list[types.Tool]:
         types.Tool(
             name=name,
             description=_DESCRIPTIONS[name],
-            inputSchema=_SCHEMAS[name],
+            input_schema=_SCHEMAS[name],
             annotations=_ANNOTATIONS[name],
         )
         for name in _SCHEMAS
     ]
 
 
-@server.list_tools()  # type: ignore[misc]
-async def list_tools() -> list[types.Tool]:
-    return tool_specs()
+async def list_tools(
+    ctx: ServerRequestContext | None, params: types.PaginatedRequestParams | None
+) -> types.ListToolsResult:
+    return types.ListToolsResult(tools=tool_specs())
 
 
-@server.call_tool()  # type: ignore[misc]
-async def handle_call_tool(name: str, arguments: dict[str, Any] | None) -> types.CallToolResult:
-    return await asyncio.to_thread(call_tool, name, arguments or {})
+async def handle_call_tool(
+    ctx: ServerRequestContext | None, params: types.CallToolRequestParams
+) -> types.CallToolResult:
+    return await asyncio.to_thread(call_tool, params.name, params.arguments or {})
+
+
+server: Server = Server(
+    f"mech-mcp/{__version__}", on_list_tools=list_tools, on_call_tool=handle_call_tool
+)
 
 
 async def _serve() -> None:
