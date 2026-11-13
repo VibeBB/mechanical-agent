@@ -103,7 +103,7 @@ def test_mcp_doctor():
     from mech.mcp_server import call_tool
 
     result = call_tool("mech_doctor", {})
-    assert not result.isError
+    assert not result.is_error
     payload = _tool_payload(result)
     assert payload["verdict"] in {"pass", "fail"}
 
@@ -112,7 +112,7 @@ def test_mcp_standards_threads():
     from mech.mcp_server import call_tool
 
     result = call_tool("mech_standards", {"kind": "threads"})
-    assert not result.isError
+    assert not result.is_error
     payload = _tool_payload(result)
     assert "M5" in json.dumps(payload)
 
@@ -129,7 +129,7 @@ def test_mcp_fit_lookup():
             "intent": "clearance",
         },
     )
-    assert not result.isError
+    assert not result.is_error
     payload = _tool_payload(result)
     assert payload["fit"]["classification"] == "clearance"
 
@@ -138,7 +138,7 @@ def test_mcp_validate_brief(enclosure_brief_dict: dict[str, Any]):
     from mech.mcp_server import call_tool
 
     result = call_tool("mech_validate_brief", {"brief": enclosure_brief_dict})
-    assert not result.isError
+    assert not result.is_error
     payload = _tool_payload(result)
     assert payload["brief"]["design_type"] == "enclosure"
 
@@ -147,14 +147,14 @@ def test_mcp_unknown_tool_fail_closed():
     from mech.mcp_server import call_tool
 
     result = call_tool("mech_nonsense", {})
-    assert result.isError
+    assert result.is_error
 
 
 def test_mcp_bad_arguments_fail_closed():
     from mech.mcp_server import call_tool
 
     result = call_tool("mech_validate_brief", {"brief": {"design_type": "x"}})
-    assert result.isError
+    assert result.is_error
 
 
 def test_mcp_rejects_paths_outside_workspace(
@@ -174,8 +174,8 @@ def test_mcp_rejects_paths_outside_workspace(
         },
     )
 
-    assert traversal.isError
-    assert absolute.isError
+    assert traversal.is_error
+    assert absolute.is_error
     assert "outside the workspace" in _tool_payload(traversal)["failure_reason"]
     assert "outside the workspace" in _tool_payload(absolute)["failure_reason"]
 
@@ -197,7 +197,7 @@ def test_mcp_export_envelope_accepts_relative_workspace_path(
         {"brief": brief, "out_path": "contracts/demo.envelope.json"},
     )
 
-    assert not result.isError
+    assert not result.is_error
     assert (tmp_path / "contracts" / "demo.envelope.json").is_file()
 
 
@@ -258,10 +258,10 @@ def test_mcp_tool_annotations():
         annotations = tool.annotations
         assert annotations is not None
         assert annotations.title
-        assert annotations.readOnlyHint is (tool.name not in write_tools)
-        assert annotations.destructiveHint is (tool.name in write_tools)
-        assert annotations.idempotentHint is True
-        assert annotations.openWorldHint is False
+        assert annotations.read_only_hint is (tool.name not in write_tools)
+        assert annotations.destructive_hint is (tool.name in write_tools)
+        assert annotations.idempotent_hint is True
+        assert annotations.open_world_hint is False
 
 
 def test_cli_author_renders_and_gates_rerun(
@@ -330,9 +330,9 @@ def test_mcp_author_inline_views_image(tmp_path: Path, monkeypatch: pytest.Monke
         (Path(__file__).resolve().parent.parent / "examples" / "enclosure.brief.json").read_text()
     )
     result = call_tool("mech_author", {"brief": brief_dict, "out_dir": str(tmp_path / "out")})
-    assert not result.isError
+    assert not result.is_error
     images = [c for c in result.content if isinstance(c, types.ImageContent)]
-    assert len(images) == 1 and images[0].mimeType == "image/png"
+    assert len(images) == 1 and images[0].mime_type == "image/png"
     text = result.content[0]
     assert isinstance(text, types.TextContent)
     payload = json.loads(text.text)
