@@ -36,6 +36,7 @@ def test_project_dependencies_parsed():
     deps = dependency_names(project_data(ROOT))
     assert "build123d" in deps
     assert "openhands-sdk" in deps
+    assert "jsonschema" in deps
     assert "pytest" in deps
     assert "pytest-cov" in deps
 
