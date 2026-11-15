@@ -55,6 +55,7 @@ hooks:
         - type: command
           name: record-image-observation
           command: 'p=$(for c in  "${MECH_PLUGIN_ROOT:-}" "${PLUGIN_ROOT:-}" "${OPENHANDS_PROJECT_DIR:-.}/plugins/mech" "${HOME:-}/.agents/plugins/mech" "${HOME:-}/.openhands/plugins/installed/mech"; do [ -f "$c/hooks/scripts/record_image_observation.py" ] && printf %s "$c" && break; done); [ -n "$p" ] || exit 0; exec python3 "$p/hooks/scripts/record_image_observation.py"'
+
 permission_mode: never_confirm
 ---
 
