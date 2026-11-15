@@ -20,6 +20,12 @@ when_to_use_examples:
   - ブリーフから筐体/ブラケット/ギアを生成して全ゲートを通す
   - Author CAD artifacts and drive every gate check to pass
 hooks:
+  session_start:
+    - matcher: "*"
+      hooks:
+        - type: command
+          name: require-records
+          command: "p=$(for c in  \"${MECH_PLUGIN_ROOT:-}\" \"${PLUGIN_ROOT:-}\" \"${OPENHANDS_PROJECT_DIR:-.}/plugins/mech\" \"${HOME:-}/.agents/plugins/mech\" \"${HOME:-}/.openhands/plugins/installed/mech\" \"${HOME:-}/plugins/installed/mech\" \"${OH_PERSISTENCE_DIR:-/nonexistent}/plugins/installed/mech\"; do [ -f \"$c/hooks/scripts/require_records.py\" ] && printf %s \"$c\" && break; done); [ -n \"$p\" ] || exit 0; exec python3 \"$p/hooks/scripts/require_records.py\" session-start"
   pre_tool_use:
     - matcher: file_editor|apply_patch|terminal
       hooks:
@@ -98,3 +104,11 @@ Vision and impressions are advisory: they never override a deterministic
 gate verdict. Results do not have to be identical from run to run; the
 reasoning must be recorded every run. `mech_records_status` shows what is
 still owed.
+
+
+Use the native `session_id` supplied by your SessionStart record context for VRP
+writes. For an independent blind/tiebreak review, pass `primary_event_id` from
+the delegation brief; the writer binds it to the same image path and SHA-256.
+When delegating, provide only that opaque ID, the image identity and task facts;
+never disclose the earlier review prose. Each reviewer keeps its own native
+session ID, and the primary's session performs reconciliation.
