@@ -1,7 +1,7 @@
 ---
 name: mech-gates
 description: Deterministic gate checks for generated mechanical designs — what each verifies and how to fix failures.
-version: 0.1.0
+version: 1.0.0
 license: BSD-3-Clause
 triggers:
   - gates
