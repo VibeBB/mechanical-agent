@@ -1,7 +1,7 @@
 ---
 name: mech-mechanism
 description: Rules for gears, snap fits, ribs, bosses, living hinges, and detents.
-version: 0.1.0
+version: 1.0.0
 license: BSD-3-Clause
 triggers:
   - mechanism

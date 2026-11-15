@@ -1,7 +1,7 @@
 ---
 name: mech-brief
 description: Define and validate a provenance-bound mechanical design brief before CAD authoring.
-version: 0.1.0
+version: 1.0.0
 license: BSD-3-Clause
 triggers:
   - design brief

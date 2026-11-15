@@ -1,7 +1,7 @@
 ---
 name: mech-enclosure
 description: Decide enclosure architecture — lid fastening, board mounting, openings, vents, walls.
-version: 0.1.0
+version: 1.0.0
 license: BSD-3-Clause
 triggers:
   - enclosure
