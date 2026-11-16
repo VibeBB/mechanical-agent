@@ -523,6 +523,7 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         image = _image_content(Path(assembly_views))
         if image is not None:
             result.content.append(image)
+            result.content = _with_image_metadata(result.content)
     return result
 
 

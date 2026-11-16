@@ -339,3 +339,9 @@ def test_mcp_author_inline_views_image(tmp_path: Path, monkeypatch: pytest.Monke
     assert payload["verdict"] == "pass"
     views = [r for r in payload["renders"] if r["kind"] == "views"]
     assert views and Path(views[0]["png_path"]).name.endswith(".views.png")
+    assert images[0].meta is not None
+    claim = images[0].meta["vibebb_image_identity"]
+    assert claim["path"] == str(Path(views[0]["png_path"]).resolve())
+    assert claim["owner_plugin"] == "mech"
+    metadata = [json.loads(c.text) for c in result.content if isinstance(c, types.TextContent)]
+    assert any(m.get("inline_images") for m in metadata)
