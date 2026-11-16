@@ -1,5 +1,5 @@
 {
-  "brief_sha256": "99b6911b56746c736ac0b41310629a3921e8361213c1b02aa8f403ecb5104d90",
+  "brief_sha256": "72647b4eb26337621a9f3e17734927d95374a403e19094a98f5e328d8adb55f9",
   "requirements": [
     {
       "id": "R1",
@@ -34,8 +34,13 @@
     },
     {
       "id": "A2",
-      "text": "Vent slots on the left wall are decorative/cooling",
-      "rationale": "user sketched slots but gave no airflow requirement"
+      "text": "SC1 uses illustrative wall and gap tolerances with a 2.0 to 2.5 mm stack target",
+      "rationale": "the example has no measured manufacturing capability or supplied tolerance requirement"
+    },
+    {
+      "id": "A3",
+      "text": "FT1 illustrates a nominal 5 mm H7/g6 clearance fit on the shell",
+      "rationale": "no mating-part drawing or user-specified fit was provided"
     }
   ],
   "open_questions": [],
@@ -65,7 +70,7 @@
       "R3"
     ],
     "FT1": [
-      "R4"
+      "A3"
     ],
     "SC1": [
       "A2"

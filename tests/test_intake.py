@@ -35,6 +35,17 @@ def test_ready_when_fully_mapped(enclosure_brief: DesignBrief, tmp_path: Path):
     assert report.sha_matches
 
 
+def test_committed_example_intake_matches_brief():
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    brief_path = examples / "enclosure.brief.json"
+    intake_path = examples / "enclosure.intake.json"
+    brief = DesignBrief.model_validate_json(brief_path.read_text(encoding="utf-8"))
+    intake = Intake.model_validate_json(intake_path.read_text(encoding="utf-8"))
+    report = check_intake(brief, intake, brief_path, intake_path)
+    assert report.sha_matches
+    assert report.verdict == "ready", report.reasons
+
+
 def test_open_question_blocks(enclosure_brief: DesignBrief, tmp_path: Path):
     data = _intake_dict(enclosure_brief)
     data["open_questions"] = [{"id": "Q1", "text": "lid type?"}]
