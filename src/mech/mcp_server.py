@@ -12,9 +12,9 @@ import asyncio
 import base64
 import dataclasses
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import ValidationError, validate
 from mcp import types
@@ -23,7 +23,7 @@ from mcp.server.lowlevel import NotificationOptions
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
-from . import __version__
+from . import __version__, _vrp
 from .doctor import run_doctor
 from .records import (
     DecisionInput,
@@ -384,27 +384,31 @@ _DESCRIPTIONS = {
 
 def _ok(payload: dict[str, Any]) -> types.CallToolResult:
     return types.CallToolResult(
-        content=[
-            types.TextContent(
-                type="text",
-                text=json.dumps(payload, ensure_ascii=False, sort_keys=True),
-            )
-        ]
+        content=_with_image_metadata(
+            [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(payload, ensure_ascii=False, sort_keys=True),
+                )
+            ]
+        )
     )
 
 
 def _error(reason: str) -> types.CallToolResult:
     return types.CallToolResult(
-        content=[
-            types.TextContent(
-                type="text",
-                text=json.dumps(
-                    {"ok": False, "fail_closed": True, "failure_reason": reason},
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            )
-        ],
+        content=_with_image_metadata(
+            [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"ok": False, "fail_closed": True, "failure_reason": reason},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                )
+            ]
+        ),
         is_error=True,
     )
 
@@ -420,7 +424,12 @@ def _image_content(path: Path) -> types.ImageContent | None:
         data = base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError:
         return None
-    return types.ImageContent(type="image", data=data, mime_type=mime)
+    return types.ImageContent(
+        type="image",
+        data=data,
+        mime_type=mime,
+        _meta=_vrp.rendered_image_metadata(path, base64.b64decode(data), "mech"),
+    )
 
 
 def _path_arg(arguments: dict[str, Any], key: str) -> Path:
@@ -514,6 +523,7 @@ def _run_pipeline(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         image = _image_content(Path(assembly_views))
         if image is not None:
             result.content.append(image)
+            result.content = _with_image_metadata(result.content)
     return result
 
 
@@ -534,9 +544,9 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             validate(arguments, spec.input_schema)
         except ValidationError as exc:
             return types.CallToolResult(
-                content=[
-                    types.TextContent(type="text", text=f"Input validation error: {exc.message}")
-                ],
+                content=_with_image_metadata(
+                    [types.TextContent(type="text", text=f"Input validation error: {exc.message}")]
+                ),
                 is_error=True,
             )
     try:
@@ -692,7 +702,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             image = _image_content(Path(render.png_path))
             if image is not None:
                 content.append(image)
-            return types.CallToolResult(content=content)
+            return types.CallToolResult(content=_with_image_metadata(content))
         if name == "mech_render_section":
             from .cli import section_payload
             from .views import render_section
@@ -719,7 +729,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             image = _image_content(Path(section.png_path))
             if image is not None:
                 content.append(image)
-            return types.CallToolResult(content=content)
+            return types.CallToolResult(content=_with_image_metadata(content))
         if name == "mech_render_views":
             from .views import render_views
 
@@ -752,7 +762,7 @@ def call_tool(name: str, arguments: dict[str, Any]) -> types.CallToolResult:
             image = _image_content(Path(views.png_path))
             if image is not None:
                 content.append(image)
-            return types.CallToolResult(content=content)
+            return types.CallToolResult(content=_with_image_metadata(content))
         return _error(f"unknown mech tool: {name}")
     except Exception as exc:  # fail-closed transport boundary
         return _error(str(exc))
@@ -847,6 +857,33 @@ async def _serve() -> None:
 
 def main() -> None:
     asyncio.run(_serve())
+
+
+def _with_image_metadata(content: Sequence[types.ContentBlock]) -> list[types.ContentBlock]:
+    """Keep producer identity in text because SDK image conversion can omit metadata."""
+    inline_images: list[dict[str, object]] = []
+    for block in content:
+        if not isinstance(block, types.ImageContent):
+            continue
+        identity: object = (block.meta or {}).get("vibebb_image_identity")
+        if not isinstance(identity, dict):
+            continue
+        claim = cast(dict[str, object], identity)
+        inline_images.append(
+            {
+                "path": claim.get("path"),
+                "sha256": claim.get("sha256"),
+                "attached": True,
+                "identity_status": "bound",
+                "image_identity": claim,
+            }
+        )
+    if not inline_images:
+        return list(content)
+    return [
+        *content,
+        types.TextContent(type="text", text=json.dumps({"inline_images": inline_images})),
+    ]
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ hooks:
         - type: command
           name: record-vision-tool-event
           command: 'p=$(for c in  "${MECH_PLUGIN_ROOT:-}" "${PLUGIN_ROOT:-}" "${OPENHANDS_PROJECT_DIR:-.}/plugins/mech" "${HOME:-}/.agents/plugins/mech" "${HOME:-}/.openhands/plugins/installed/mech"; do [ -f "$c/hooks/scripts/record_vision_tool_event.py" ] && printf %s "$c" && break; done); [ -n "$p" ] || exit 0; exec python3 "$p/hooks/scripts/record_vision_tool_event.py"'
-    - matcher: file_editor
+    - matcher: "file_editor|mech_author|mech_render|mech_render_section|mech_render_views"
       hooks:
         - type: command
           name: record-image-observation
