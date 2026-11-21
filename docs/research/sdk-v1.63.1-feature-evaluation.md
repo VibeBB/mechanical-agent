@@ -29,28 +29,28 @@ Primary sources:
 | Upstream change | Decision | Evaluation |
 | --- | --- | --- |
 | feat(agent-server): experimental features the user can turn on or off (#6759) + Conversation reactions + factories flag (#7016, v1.63.1) | available, not adopted | Agent-server-side experimental gating and the first experiment (reactions). VibeBB plugins run inside OpenHands, not a self-hosted agent-server; no plugin wiring references experiments. |
-| feat(sdk): expose restart recovery provenance and outcome dispositions |  held at 0.125.0 | Better observability for the resume path plugins rely on. |
-| fix(sdk): drop a since-disabled ambient plugin's skills and MCP servers on resume (#5756) |  held at 0.125.0 | Prevents stale skills/MCP servers leaking into a resumed session when a plugin was disabled. Directly relevant to every VibeBB plugin. |
-| fix(sdk): keep one copy of a plugin's hooks when it is loaded twice (#5815) |  held at 0.125.0 | Hooks dedupe for double-loaded plugins; the shared hook contracts stay single-registered. |
-| fix: inherit parent secret sources in task sub-agents (#6757) |  held at 0.125.0 | Task-delegated sub-agents (all VibeBB review/design delegates) now inherit the parent's secret sources; matches how the plugins expect secrets to flow. |
-| fix(sdk): consolidate capability resolution and reject silent image loss (#6040) + deepseek-v4.1-flash vision detection + DeepSeek image-loss bad-request |  held at 0.125.0 | Vision-capability resolution hardened; VibeBB vision-review paths can no longer silently drop images. |
-| feat: enable MCP protocol auto negotiation (#6794) |  held at 0.125.0 | The repo's stdio MCP server now negotiates protocol versions automatically; no code change needed. |
-| fix(task): key the task tool examples by the built-in agents' names |  held at 0.125.0 | Task-tool guidance now matches delegated agent names. |
-| fix(conversation): let run() resume a detector-STUCK conversation + persist state while a step waits on the model |  held at 0.125.0 | Resume reliability for long-running plugin sessions. |
-| Secret masking in thinking_blocks + signature preservation + keep the source's cipher and secrets on a forked conversation |  held at 0.125.0 | Secret-handling hardening; no plugin action. |
-| fix(llm) batch: bounded retries on persistent timeouts, retry content-free completions, classify safe exception types, record span messages/token totals |  held at 0.125.0 | LLM-call robustness in the shared layer. |
-| fix(agent-server) batch: socket close on delete/shutdown, one ServerContext per init, lease takeover for reused/zombie PIDs, public MCP OAuth callbacks, SameSite=Lax workspace cookie, gateway paused-conversation replies |  held at 0.125.0 | Server lifecycle fixes upstream of the plugins. |
-| fix(browser): kill hung browser on reset/close; fix(terminal): Windows process termination before pipe close; fix: tmux init race |  held at 0.125.0 | Tool-layer stability fixes. |
-| Dependency churn (fastmcp 4.1.6, pydantic 2.14.3, boto3, posthog, sqlalchemy, cachetools, joserfc, streamlit, pytest-asyncio) |  held at 0.125.0 | Transitive bumps land through the lock. |
+| feat(sdk): expose restart recovery provenance and outcome dispositions | adopted implicitly | Better observability for the resume path plugins rely on. |
+| fix(sdk): drop a since-disabled ambient plugin's skills and MCP servers on resume (#5756) | adopted implicitly | Prevents stale skills/MCP servers leaking into a resumed session when a plugin was disabled. Directly relevant to every VibeBB plugin. |
+| fix(sdk): keep one copy of a plugin's hooks when it is loaded twice (#5815) | adopted implicitly | Hooks dedupe for double-loaded plugins; the shared hook contracts stay single-registered. |
+| fix: inherit parent secret sources in task sub-agents (#6757) | adopted implicitly | Task-delegated sub-agents (all VibeBB review/design delegates) now inherit the parent's secret sources; matches how the plugins expect secrets to flow. |
+| fix(sdk): consolidate capability resolution and reject silent image loss (#6040) + deepseek-v4.1-flash vision detection + DeepSeek image-loss bad-request | adopted implicitly | Vision-capability resolution hardened; VibeBB vision-review paths can no longer silently drop images. |
+| feat: enable MCP protocol auto negotiation (#6794) | adopted implicitly | The repo's stdio MCP server now negotiates protocol versions automatically; no code change needed. |
+| fix(task): key the task tool examples by the built-in agents' names | adopted implicitly | Task-tool guidance now matches delegated agent names. |
+| fix(conversation): let run() resume a detector-STUCK conversation + persist state while a step waits on the model | adopted implicitly | Resume reliability for long-running plugin sessions. |
+| Secret masking in thinking_blocks + signature preservation + keep the source's cipher and secrets on a forked conversation | adopted implicitly | Secret-handling hardening; no plugin action. |
+| fix(llm) batch: bounded retries on persistent timeouts, retry content-free completions, classify safe exception types, record span messages/token totals | adopted implicitly | LLM-call robustness in the shared layer. |
+| fix(agent-server) batch: socket close on delete/shutdown, one ServerContext per init, lease takeover for reused/zombie PIDs, public MCP OAuth callbacks, SameSite=Lax workspace cookie, gateway paused-conversation replies | adopted implicitly | Server lifecycle fixes upstream of the plugins. |
+| fix(browser): kill hung browser on reset/close; fix(terminal): Windows process termination before pipe close; fix: tmux init race | adopted implicitly | Tool-layer stability fixes. |
+| Dependency churn (fastmcp 4.1.6, pydantic 2.14.3, boto3, posthog, sqlalchemy, cachetools, joserfc, streamlit, pytest-asyncio) | adopted implicitly | Transitive bumps land through the lock. |
 
 ## SDK 1.63.0 -> 1.63.1
 
 | Upstream change | Decision | Evaluation |
 | --- | --- | --- |
 | fix(sdk): keep openhands-sdk importable on a fresh litellm install (#7015) | adopted | The SDK now requires `litellm>=1.108.3,<1.109` (its own workspace constraint pins `==1.108.3`, which does not propagate downstream); this lock resolves 1.108.14. litellm 1.108.x relaxes `filelock` to `<5`, which is what allows the repo's `filelock>=4.2.1` override to be dropped in this sweep. |
-| fix(mcp): keep runtime-added MCP tool names across restart and resume (#6929) |  held at 0.125.0 | MCP tool names survive restart/resume; relevant to plugin MCP servers. |
-| fix(llm): classify orphan tool messages as a malformed history (#6678) |  held at 0.125.0 | History validation instead of silent failure. |
-| fix(sdk): close built tool executors when response_schema is rejected + fix(acp): bill fork usage updates in ask_agent + fix(browser) close_tab |  held at 0.125.0 | Correctness in tool executor and ACP/browser edges. |
+| fix(mcp): keep runtime-added MCP tool names across restart and resume (#6929) | adopted implicitly | MCP tool names survive restart/resume; relevant to plugin MCP servers. |
+| fix(llm): classify orphan tool messages as a malformed history (#6678) | adopted implicitly | History validation instead of silent failure. |
+| fix(sdk): close built tool executors when response_schema is rejected + fix(acp): bill fork usage updates in ask_agent + fix(browser) close_tab | adopted implicitly | Correctness in tool executor and ACP/browser edges. |
 | New verified-model list entries | noted | Verified-list additions are informational; LLM profiles stay user-configured. |
 
 ## Other components
@@ -58,8 +58,8 @@ Primary sources:
 | Component | From -> to | Decision | Evaluation |
 | --- | --- | --- | --- |
 | uv | 0.13.8 -> 0.13.9 | adopted | `required-version`, Dockerfile `UV_VERSION`/`UV_DIGEST`, setup-uv `version:` input. Changelog reviewed: PEP 832 support (informational), lockfile size reduction (benefits `uv.lock` size), wheel name-mismatch rejection (stricter — safe). |
-| ruff | lock drift -> 0.17.5/0.17.6 |  held at 0.125.0 | Bug-fix releases incl. a preview TC010 fix; no config change. |
-| pydantic | lock drift -> 2.14.4 |  held at 0.125.0 | jiter 0.19.0 bump + JSON Schema fixes. |
+| ruff | lock drift -> 0.17.5/0.17.6 | adopted implicitly | Bug-fix releases incl. a preview TC010 fix; no config change. |
+| pydantic | lock drift -> 2.14.4 | adopted implicitly | jiter 0.19.0 bump + JSON Schema fixes. |
 | transitive majors (browser-use, openai, google-genai; anthropic held at 0.125.0) | lock drift | adopted implicitly | Major-version bumps pulled by the SDK's declared ranges; the plugin does not call these APIs directly. anthropic stays on the 0.x line via override-dependencies because the 2026-11-20 2.x release trips the Trivy gcp-service-account secret gate; see scripts/dependency_update_deferrals.json. |
 | filelock override | `filelock>=4.2.1` -> dropped | adopted (removal) | The override existed only to outrun litellm<1.108's `filelock<4.0` cap for CVE-2026-112940; litellm 1.108.x allows `<5` and the lock resolves 4.2.12. |
 | step-security/harden-runner | v2.22.4 -> v2.23.0 | adopted | Secure Registry community tier (available, not wired), S3 URL redaction fix (adopted implicitly). |
