@@ -68,4 +68,3 @@ Primary sources:
 | actions/dependency-review-action | v5.0.0 -> v5.0.1 | adopted | Better compare-endpoint error reporting; pin-only. |
 | ossf/scorecard-action | v2.5.0 -> v2.6.0 | adopted | Scorecard v5.7.0. New `fail_on_publish_error` input evaluated and not adopted: result publishing must never fail the required scorecard check. Example-workflow additions not applicable. |
 | publish lock-resolution comment | refreshed to `litellm==1.108.3` | docs | The re-resolve floors list is unchanged; SDK 1.63.1's lock still has fsspec/pypdf/aiohttp/oauthlib/dnspython below floors. |
-
