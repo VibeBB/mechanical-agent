@@ -89,14 +89,14 @@ jobs:
       packages: write
       pull-requests: write
     steps:
-      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
           disable-telemetry: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           python-version: "3.14"
           cache-suffix: publish
@@ -206,7 +206,7 @@ jobs:
         # pillow 12.3.0 (fixed in 13.0.0), pypdf 6.14.2, aiohttp 3.14.3,
         # Authlib 1.6.12, oauthlib 3.3.1, dnspython 2.8.0,
         # virtualenv 20.36.1, filelock 3.20.3. Re-resolve each in the cloned
-        # lockfile before the build. SDK >=1.62.0 pins litellm==1.105.1,
+        # lockfile before the build. SDK >=1.63.1 pins litellm==1.108.3,
         # already above the 1.100.4 fix floor, so no litellm relaxation is
         # needed; scripts/check_dependency_updates.py's sdk-litellm-pin
         # target flags if upstream drops below the floor again.
@@ -702,14 +702,14 @@ jobs:
       - name: Upload tools Trivy SARIF
         # A rehearsal must not file code-scanning alerts.
         if: always() && (inputs.dry_run != true && github.event_name != 'pull_request') && inputs.skip_tools != true && hashFiles('trivy-mech-tools.sarif') != ''
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: trivy-mech-tools.sarif
           category: trivy-mech-tools
       - name: Upload server Trivy SARIF
         # A rehearsal must not file code-scanning alerts.
         if: always() && (inputs.dry_run != true && github.event_name != 'pull_request') && hashFiles('trivy-mech-server.sarif') != ''
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: trivy-mech-server.sarif
           category: trivy-mech-server
