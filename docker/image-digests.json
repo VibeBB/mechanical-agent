@@ -1,34 +1,34 @@
 {
   "mech_server": {
-    "digest": "sha256:5a9a0e983a1efb6d5b72491d9fef7e5c1736963a2085f598900b995c2df659f2",
-    "dockerfile": "sdk:openhands-agent-server/v1.62.0",
+    "digest": "sha256:ab1cba0827b03f0e6e5da1ac9e86f8ac3867e5e36e0e706a7d31ce8b4cb2910f",
+    "dockerfile": "sdk:openhands-agent-server/v1.63.1",
     "image": "ghcr.io/vibebb/mech-server",
-    "published_at": "2026-11-17T00:08:40Z",
-    "tag": "de9e905-_tag_ed97b34410c955510c10fbd61393236f1935a0a5e26d61-5fcee830de0d-source",
+    "published_at": "2026-11-21T03:32:30Z",
+    "tag": "3d121e7-_tag_2e4888cf78a39804f4a717f5fe437774abf50eac631da1-ae36b69e9800-source",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
       "mech": "0.1.0",
       "python": "Python 3.14.10",
-      "uv": "0.13.8 (x86_64-unknown-linux-musl)"
+      "uv": "0.13.9 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/43979422064"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/44860061761"
   },
   "mech_tools": {
-    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/68383458",
-    "digest": "sha256:ed97b34410c955510c10fbd61393236f1935a0a5e26d61b6e34a179a43d943c9",
+    "attestation": "https://github.com/VibeBB/mechanical-agent/attestations/70428020",
+    "digest": "sha256:2e4888cf78a39804f4a717f5fe437774abf50eac631da104c9b746d44918361d",
     "dockerfile": "docker/mech-tools.Dockerfile",
     "image": "ghcr.io/vibebb/mech-tools",
-    "published_at": "2026-11-17T00:08:40Z",
-    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/68384759",
-    "tag": "de9e905e72a886ddd8996b7c7904892e3d3a5210-tools",
+    "published_at": "2026-11-21T03:32:30Z",
+    "sbom_attestation": "https://github.com/VibeBB/mechanical-agent/attestations/70429279",
+    "tag": "3d121e7db4e007d1392ad1b72b30157f30f73dcb-tools",
     "tools": {
       "build123d": "0.13.0",
       "git": "2.47.3",
       "mech": "0.1.0",
       "python": "Python 3.14.10",
-      "uv": "0.13.8 (x86_64-unknown-linux-musl)"
+      "uv": "0.13.9 (x86_64-unknown-linux-musl)"
     },
-    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/43979422064"
+    "workflow_run": "https://github.com/VibeBB/mechanical-agent/actions/runs/44860061761"
   }
 }
