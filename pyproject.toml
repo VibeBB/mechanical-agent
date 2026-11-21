@@ -38,7 +38,10 @@ required-version = "==0.13.9"
 # feeds build123d's viewer/material export only, so overriding the pillow
 # bound is safe for the mech generation/gate path; threejs-materials 1.2.5
 # itself allows pillow<14, so <14 is honest..
-override-dependencies = ["pillow>=12.3.0,<14"]
+# anthropic 2.x (released 2026-11-20) ships `beta/agents` type docstrings whose
+# example payloads trip Trivy's gcp-service-account secret rule in the publish
+# gate; every other family repo resolves the 0.x line, so hold <1 for parity.
+override-dependencies = ["pillow>=12.3.0,<14", "anthropic>=0.125.0,<1"]
 
 [tool.ruff]
 line-length = 100
